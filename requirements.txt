@@ -1,0 +1,2 @@
+environs[django]==9.5.*
+django==4.1.*
