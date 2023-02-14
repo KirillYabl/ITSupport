@@ -1,3 +1,5 @@
 environs[django]==9.5.*
 django==4.1.*
 django-debug-toolbar==3.8.*
+djangorestframework==3.14.*
+markdown==3.4.*
