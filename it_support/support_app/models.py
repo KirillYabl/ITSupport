@@ -70,7 +70,17 @@ class Client(BotUser):
         return f'{self.tg_nick} ({self.status})'
 
 
+class ContractorQuerySet(models.QuerySet):
+    def get_available(self):
+        not_available_contractors = Order.objects.select_related('contractor').filter(
+            status=Order.Status.in_work).values('contractor').distinct()
+        not_available_contractor_ids = [contractor.id for contractor in not_available_contractors]
+        return self.exclude(id__in=not_available_contractor_ids)
+
+
 class Contractor(BotUser):
+    objects = ContractorQuerySet.as_manager()
+
     class Meta:
         verbose_name = 'подрядчик'
         verbose_name_plural = 'подрядчики'
