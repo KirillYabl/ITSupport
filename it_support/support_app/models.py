@@ -199,6 +199,21 @@ class Order(models.Model):
                     warning_orders.append(tariff_order)
         return warning_orders
 
+    def get_warning_orders_not_closed(self):
+        orders_not_closed = self.objects.select_related('client', 'contractor').filter(
+            status=self.Status.in_work,
+            late_work_manager_informed=False,
+        )
+        warning_orders = []
+
+        for order in orders_not_closed:
+            not_closed_time = order.assigned_at - timezone.now()
+            limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
+            limit = 0.95
+            if not_closed_time.total_seconds() / limit_seconds > limit:
+                warning_orders.append(order)
+        return warning_orders
+
     class Meta:
         verbose_name = 'тариф'
         verbose_name_plural = 'тарифы'
