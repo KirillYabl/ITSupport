@@ -14,6 +14,7 @@ class BotUser(models.Model):
         client = 'Клиент'
         contractor = 'Подрядчик'
         manager = 'Менеджер'
+        owner = 'Владелец'
 
     class Status(models.TextChoices):
         active = 'Активный'
@@ -137,6 +138,14 @@ class Manager(BotUser):
     def __str__(self):
         return f'{self.tg_nick} ({self.status})'
 
+
+class Owner(BotUser):
+    class Meta:
+        verbose_name = 'владелец'
+        verbose_name_plural = 'владельцы'
+
+    def __str__(self):
+        return f'{self.tg_nick} ({self.status})'
 
 class OrderQuerySet(models.QuerySet):
     def get_warning_orders_not_in_work(self):
