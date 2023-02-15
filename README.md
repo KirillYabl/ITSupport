@@ -13,6 +13,12 @@
 DJANGO_SECRET_KEY=REPLACE_ME
 ```
 
+Для запуска телеграм бота необходимо прописать в `.env` его `токен`:
+
+```text
+TELEGRAM_ACCESS_TOKEN=
+```
+
 Создать виртуальное окружение в корневой папке проекта
 
 ```shell
@@ -38,6 +44,11 @@ python manage.py migrate
 
 ```shell
 python manage.py runserver
+```
+Для запуска бота выполнить команду:
+
+```shell
+python manage.py start_bot
 ```
 
 ## Цели проекта
