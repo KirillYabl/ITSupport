@@ -87,6 +87,28 @@ class Client(BotUser):
     def can_create_orders(self):
         return self.paid
 
+    def has_limit_of_orders(self):
+        try:
+            billing_day = int(SystemSettings.objects.get('BILLING_DAY').parameter_value)
+        except (SystemSettings.DoesNotExist, ValueError):
+            billing_day = 1
+
+        now = timezone.now()
+
+        if billing_day <= now.day:
+            min_date = timezone.datetime(now.year, now.month, now.day)
+        else:
+            before = now - timezone.timedelta(days=28)
+            min_date = timezone.datetime(before.year, before.month, billing_day)
+
+        created_orders_count = self.orders.filter(created_at__gte=min_date).count()
+        can_create_orders_count = self.tariff.orders_limit
+
+        return can_create_orders_count > created_orders_count
+
+    def has_active_order(self):
+        return self.orders.filter(status=Order.Status.in_work).count() > 0
+
     objects = ClientQuerySet.as_manager()
 
     class Meta:
@@ -146,6 +168,7 @@ class Owner(BotUser):
 
     def __str__(self):
         return f'{self.tg_nick} ({self.status})'
+
 
 class OrderQuerySet(models.QuerySet):
     def get_warning_orders_not_in_work(self):
