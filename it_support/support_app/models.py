@@ -21,6 +21,13 @@ class BotUser(models.Model):
     )
     role = models.CharField('роль', max_length=30, choices=Role.choices)
     status = models.CharField('статус', max_length=30, choices=Status.choices, db_index=True)
+    telegram_id = models.IntegerField('telegram Id', db_index=True, blank=True, null=True)
+    bot_state = models.CharField(
+        'текущее состояния бота',
+        max_length=100,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = 'пользователь бота'
