@@ -26,7 +26,7 @@ class BotUser(models.Model):
         validators=[MinLengthValidator(5), RegexValidator(REGEX_TELEGRAM_NICKNAME)]
     )
     role = models.CharField('роль', max_length=30, choices=Role.choices)
-    status = models.CharField('статус', max_length=30, choices=Status.choices, db_index=True)
+    status = models.CharField('статус', max_length=30, choices=Status.choices, default=Status.active, db_index=True)
     telegram_id = models.IntegerField('telegram Id', db_index=True, blank=True, null=True)
     bot_state = models.CharField(
         'текущее состояния бота',
@@ -65,6 +65,10 @@ class Tariff(models.Model):
 
 
 class Client(BotUser):
+    # def __init__(self, *args, **kwargs):
+    #     kwargs['role'] = kwargs.get('role') or BotUser.Role.client
+    #     super().__init__(*args, **kwargs)
+
     tariff = models.ForeignKey(Tariff, related_name='clients', on_delete=models.DO_NOTHING)
     paid = models.BooleanField('оплачен ли тариф', db_index=True)
 
