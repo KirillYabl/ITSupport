@@ -1,7 +1,11 @@
 from django.conf import settings
 from django.core.management import BaseCommand
 
-from user_app.tg_bot import TgBot, echo
+from user_app.tg_bot import TgBot
+from user_app.tg_bot import start_client
+from user_app.tg_bot import start_manager
+from user_app.tg_bot import start_contractor
+from user_app.tg_bot import start_not_found
 
 
 class Command(BaseCommand):
@@ -13,10 +17,22 @@ class Command(BaseCommand):
 
 
 def start_bot():
-
     bot = TgBot(
         settings.TELEGRAM_ACCESS_TOKEN,
-        {'echo': echo}
+        {
+            'client': {
+                'start': start_client
+            },
+            'manager': {
+                'start': start_manager
+            },
+            'contractor': {
+                'start': start_contractor
+            },
+            'unknown': {
+                'start': start_not_found
+            },
+        }
     )
     bot.updater.start_polling()
     bot.updater.idle()
