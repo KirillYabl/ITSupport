@@ -65,10 +65,6 @@ class Tariff(models.Model):
 
 
 class Client(BotUser):
-    # def __init__(self, *args, **kwargs):
-    #     kwargs['role'] = kwargs.get('role') or BotUser.Role.client
-    #     super().__init__(*args, **kwargs)
-
     tariff = models.ForeignKey(Tariff, related_name='clients', on_delete=models.DO_NOTHING)
     paid = models.BooleanField('оплачен ли тариф', db_index=True)
 
@@ -233,8 +229,8 @@ class Order(models.Model):
             self.save()
 
     class Meta:
-        verbose_name = 'тариф'
-        verbose_name_plural = 'тарифы'
+        verbose_name = 'заказ'
+        verbose_name_plural = 'заказы'
 
     def __str__(self):
         return f'Заказ {self.pk} ({self.status})'
