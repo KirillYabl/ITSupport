@@ -1,5 +1,6 @@
 from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator
 from django.db import models
+from django.db.transaction import atomic
 from django.utils import timezone
 
 
@@ -138,6 +139,25 @@ class Order(models.Model):
         default=Status.created,
         db_index=True,
     )
+
+    def take_in_work(self, contractor):
+        with atomic():
+            self.contractor = contractor
+            self.assigned_at = timezone.now()
+            self.status = self.Status.in_work
+            self.save()
+
+    def close_work(self):
+        with atomic():
+            self.closed_at = timezone.now()
+            self.status = self.Status.closed
+            self.save()
+
+    def cancel_work(self):
+        with atomic():
+            self.closed_at = timezone.now()
+            self.status = self.Status.cancelled
+            self.save()
 
     class Meta:
         verbose_name = 'тариф'
