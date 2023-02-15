@@ -4,6 +4,11 @@ from django.db.transaction import atomic
 from django.utils import timezone
 
 
+class BotUserQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(status=BotUser.Status.active)
+
+
 class BotUser(models.Model):
     class Role(models.TextChoices):
         client = 'Клиент'
@@ -140,6 +145,23 @@ class Order(models.Model):
         db_index=True,
     )
 
+    not_in_work_manager_informed = models.BooleanField(
+        'менеджер проинформирован что заказ не взят',
+        default=False,
+    )
+    late_work_manager_informed = models.BooleanField(
+        'менеджер проинформирован что заказ долго выполняется',
+        default=False,
+    )
+    in_work_client_informed = models.BooleanField(
+        'клиент проинформирован что заказ взят',
+        default=False,
+    )
+    closed_client_informed = models.BooleanField(
+        'клиент проинформирован что заказ выполнен',
+        default=False,
+    )
+
     def take_in_work(self, contractor):
         with atomic():
             self.contractor = contractor
@@ -158,6 +180,24 @@ class Order(models.Model):
             self.closed_at = timezone.now()
             self.status = self.Status.cancelled
             self.save()
+
+    def get_warning_orders_not_in_work(self):
+        orders_not_in_work = self.objects.select_related('client').filter(
+            status=self.Status.created,
+            not_in_work_manager_informed=False,
+        )
+        warning_orders = []
+        tariffs = Tariff.objects.all()
+
+        for tariff in tariffs:
+            tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
+            for tariff_order in tariff_orders:
+                not_in_work_time = tariff_order.created_at - timezone.now()
+                limit = 0.95
+                tariff_limit_seconds = tariff.reaction_time_minutes * 60
+                if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
+                    warning_orders.append(tariff_order)
+        return warning_orders
 
     class Meta:
         verbose_name = 'тариф'
