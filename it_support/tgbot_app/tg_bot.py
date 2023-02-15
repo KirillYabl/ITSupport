@@ -26,7 +26,9 @@ def get_user(func):
         username = update.effective_user.username
 
         try:
-            user = BotUser.objects.get(Q(tg_nick=username) | Q(telegram_id=chat_id))
+            user = BotUser.objects.get(
+                Q(status=BotUser.Status.active) & (Q(tg_nick=username) | Q(telegram_id=chat_id))
+            )
         except BotUser.DoesNotExist:
             user = None
 
