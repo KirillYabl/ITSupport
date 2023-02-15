@@ -113,6 +113,7 @@ class OrderQuerySet(models.QuerySet):
         warning_orders = []
         tariffs = Tariff.objects.all()
 
+        # TODO: написать через аннотейты
         for tariff in tariffs:
             tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
             for tariff_order in tariff_orders:
@@ -137,6 +138,15 @@ class OrderQuerySet(models.QuerySet):
             if not_closed_time.total_seconds() / limit_seconds > limit:
                 warning_orders.append(order)
         return warning_orders
+
+    def get_available(self):
+        return self.filter(status=Order.Status.created)
+
+    def get_in_work_not_informed(self):
+        return self.filter(status=Order.Status.in_work, in_work_client_informed=False)
+
+    def get_closed_not_informed(self):
+        return self.filter(status=Order.Status.closed, closed_client_informed=False)
 
 
 class Order(models.Model):
