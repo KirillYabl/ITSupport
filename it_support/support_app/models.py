@@ -104,6 +104,41 @@ class Manager(BotUser):
         return f'{self.tg_nick} ({self.status})'
 
 
+class OrderQuerySet(models.QuerySet):
+    def get_warning_orders_not_in_work(self):
+        orders_not_in_work = self.objects.select_related('client').filter(
+            status=self.Status.created,
+            not_in_work_manager_informed=False,
+        )
+        warning_orders = []
+        tariffs = Tariff.objects.all()
+
+        for tariff in tariffs:
+            tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
+            for tariff_order in tariff_orders:
+                not_in_work_time = tariff_order.created_at - timezone.now()
+                limit = 0.95
+                tariff_limit_seconds = tariff.reaction_time_minutes * 60
+                if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
+                    warning_orders.append(tariff_order)
+        return warning_orders
+
+    def get_warning_orders_not_closed(self):
+        orders_not_closed = self.objects.select_related('client', 'contractor').filter(
+            status=self.Status.in_work,
+            late_work_manager_informed=False,
+        )
+        warning_orders = []
+
+        for order in orders_not_closed:
+            not_closed_time = order.assigned_at - timezone.now()
+            limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
+            limit = 0.95
+            if not_closed_time.total_seconds() / limit_seconds > limit:
+                warning_orders.append(order)
+        return warning_orders
+
+
 class Order(models.Model):
     class Status(models.TextChoices):
         created = 'создан'
@@ -162,6 +197,8 @@ class Order(models.Model):
         default=False,
     )
 
+    objects = OrderQuerySet.as_manager()
+
     def take_in_work(self, contractor):
         with atomic():
             self.contractor = contractor
@@ -180,39 +217,6 @@ class Order(models.Model):
             self.closed_at = timezone.now()
             self.status = self.Status.cancelled
             self.save()
-
-    def get_warning_orders_not_in_work(self):
-        orders_not_in_work = self.objects.select_related('client').filter(
-            status=self.Status.created,
-            not_in_work_manager_informed=False,
-        )
-        warning_orders = []
-        tariffs = Tariff.objects.all()
-
-        for tariff in tariffs:
-            tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
-            for tariff_order in tariff_orders:
-                not_in_work_time = tariff_order.created_at - timezone.now()
-                limit = 0.95
-                tariff_limit_seconds = tariff.reaction_time_minutes * 60
-                if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
-                    warning_orders.append(tariff_order)
-        return warning_orders
-
-    def get_warning_orders_not_closed(self):
-        orders_not_closed = self.objects.select_related('client', 'contractor').filter(
-            status=self.Status.in_work,
-            late_work_manager_informed=False,
-        )
-        warning_orders = []
-
-        for order in orders_not_closed:
-            not_closed_time = order.assigned_at - timezone.now()
-            limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
-            limit = 0.95
-            if not_closed_time.total_seconds() / limit_seconds > limit:
-                warning_orders.append(order)
-        return warning_orders
 
     class Meta:
         verbose_name = 'тариф'
