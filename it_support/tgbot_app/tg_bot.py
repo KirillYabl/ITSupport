@@ -2,6 +2,7 @@ from typing import Callable
 
 from django.db.models import Q
 from django.db.transaction import atomic
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -159,6 +160,13 @@ def start_contractor(update, context):
 
 # Функции для владельца
 def start_owner(update, context):
+    keyboard = [
+        [InlineKeyboardButton('Биллинг подрядчиков за прошлый месяц', callback_data='contractor_billing_prev_month')],
+        [InlineKeyboardButton('Статистика по заказам', callback_data='orders_stats')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    chat_id = update.effective_chat.id
+    context.bot.send_message(text='Что вас интересует', reply_markup=reply_markup, chat_id=chat_id)
     return 'HANDLE_BUTTONS'
 
 

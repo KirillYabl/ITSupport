@@ -18,6 +18,11 @@ class ManagerAdmin(admin.ModelAdmin):
     pass
 
 
+@admin.register(m.Owner)
+class OwnerAdmin(admin.ModelAdmin):
+    pass
+
+
 @admin.register(m.Tariff)
 class TariffAdmin(admin.ModelAdmin):
     pass
