@@ -34,6 +34,10 @@ class BotUser(models.Model):
         null=True,
         blank=True,
     )
+    created_at = models.DateTimeField(
+        'дата и время создания',
+        default=timezone.now,
+    )
 
     class Meta:
         verbose_name = 'пользователь бота'
@@ -55,6 +59,8 @@ class Tariff(models.Model):
     )
     can_reserve_contractor = models.BooleanField('возможность закрепить подрядчика за собой')
     can_see_contractor_contacts = models.BooleanField('возможность увидеть контакты подрядчика')
+    # TODO: отдельная таблица выставления счета за тариф клиенту
+    price = models.DecimalField('цена', max_digits=8, decimal_places=2, validators=[MinValueValidator(0)])
 
     class Meta:
         verbose_name = 'тариф'
@@ -64,12 +70,23 @@ class Tariff(models.Model):
         return self.name
 
 
+class ClientQuerySet(models.QuerySet):
+    def calculate_orders(self, year=None, month=None):
+        # TODO: посчитать по каждому заказчику число заказов за месяц
+        pass
+
+    def get_contractors(self):
+        return self.prefetch_related('orders').orders.values('contractor').distinct()
+
+
 class Client(BotUser):
     tariff = models.ForeignKey(Tariff, related_name='clients', on_delete=models.DO_NOTHING)
     paid = models.BooleanField('оплачен ли тариф', db_index=True)
 
     def can_create_orders(self):
         return self.paid
+
+    objects = ClientQuerySet.as_manager()
 
     class Meta:
         verbose_name = 'клиент'
@@ -165,6 +182,10 @@ class OrderQuerySet(models.QuerySet):
     def get_closed_not_informed(self):
         return self.filter(status=Order.Status.closed, closed_client_informed=False)
 
+    def calculate_average_orders_in_month(self, year=None, month=None):
+        # TODO: посчитать сколько в среднем делается заказов в день в течении месяца с точностью до тарифа
+        pass
+
 
 class Order(models.Model):
     class Status(models.TextChoices):
@@ -251,3 +272,17 @@ class Order(models.Model):
 
     def __str__(self):
         return f'Заказ {self.pk} ({self.status})'
+
+
+class SystemSettings(models.Model):
+    parameter_name = models.CharField(
+        'имя системного параметра',
+        max_length=100,
+        help_text='желательно задавать на английском и без пробелов',
+    )
+    parameter_value = models.TextField(
+        'значение системного параметра',
+        blank=True,
+        help_text='может быть пустой строкой, тогда метод которому это нужно сам придумает дефолт',
+    )
+    description = models.TextField('описание параметра')
