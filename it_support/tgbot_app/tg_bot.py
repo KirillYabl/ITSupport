@@ -78,7 +78,8 @@ class TgBot(object):
         user.save()
 
     def error(self, update, context):
-        raise TelegramError
+        print(f'Update "{update}" caused error "{context.error}"')
+        raise context.error
 
     def help_handler(self, update, context):
         update.message.reply_text("Используйте /start для того, что бы перезапустить бот")
@@ -94,7 +95,7 @@ def start_not_found(update, context):
 
 # Функции для менеджера
 def start_manager(update, context):
-    """Ответ для менеджера"""
+    """Ответ для менеджера с кнопками (пока одна)"""
     return 'HANDLE_CONTACTS'
 
 
@@ -102,8 +103,11 @@ def handle_contacts(update, context):
     """
     Из модели подрядчика и заказа достать всех подрядчиков, у которых нет активных заказов.
     Ответить списком их имен телеграм (в БД они хранятся без @, нужно добавить).
-    Если к базе не умеешь делать запросы ответь заглушкой, потом поправим
+    Проверить, что менеджер нажал кнопку
+    Если не нажал, то сообщить что неизвестный ввод, но все равно вернуть на старт
     """
+    available_contractors = Contractor.objects.get_available()  # список доступных подрядчиков
+                                                                # по свойству tg_nick лежат их имена
     return start_manager(update, context)
 
 

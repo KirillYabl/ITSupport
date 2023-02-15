@@ -6,6 +6,7 @@ from tgbot_app.tg_bot import start_client
 from tgbot_app.tg_bot import start_manager
 from tgbot_app.tg_bot import start_contractor
 from tgbot_app.tg_bot import start_not_found
+from tgbot_app.tg_bot import handle_contacts
 
 
 class Command(BaseCommand):
@@ -20,17 +21,18 @@ def start_bot():
     bot = TgBot(
         settings.TELEGRAM_ACCESS_TOKEN,
         {
-            'client': {
-                'start': start_client
+            'Клиент': {
+                'START': start_client,
             },
-            'manager': {
-                'start': start_manager
+            'Менеджер': {
+                'START': start_manager,
+                'HANDLE_CONTACTS': handle_contacts
             },
-            'contractor': {
-                'start': start_contractor
+            'Подрядчик': {
+                'START': start_contractor,
             },
             'unknown': {
-                'start': start_not_found
+                'START': start_not_found,
             },
         }
     )
