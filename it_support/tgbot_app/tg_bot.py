@@ -2,7 +2,7 @@ from typing import Callable
 
 from django.db.models import Q
 from django.db.transaction import atomic
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -19,6 +19,7 @@ from support_app.models import Manager
 from support_app.models import Order
 
 from telegram.utils import request
+from pprint import pprint
 
 
 def get_user(func):
@@ -51,20 +52,21 @@ class TgBot(object):
         self.updater.dispatcher.add_handler(MessageHandler(Filters.text, get_user(self.handle_users_reply)))
         self.updater.dispatcher.add_error_handler(self.error)
         self.job_queue = self.updater.job_queue
+        # Что-то с закомментированным кодом ниже не так, присылает левые данные
 
-        self.job_queue.run_repeating(
-            self.handle_warning_orders_not_in_work,
-            interval=60,
-            first=10,
-            name='handle_warning_orders_not_in_work'
-        )
+        # self.job_queue.run_repeating(
+        #     self.handle_warning_orders_not_in_work,
+        #     interval=60,
+        #     first=10,
+        #     name='handle_warning_orders_not_in_work'
+        # )
 
-        self.job_queue.run_repeating(
-            self.handle_warning_orders_not_closed,
-            interval=60,
-            first=20,
-            name='handle_warning_orders_not_closed'
-        )
+        # self.job_queue.run_repeating(
+        #     self.handle_warning_orders_not_closed,
+        #     interval=60,
+        #     first=20,
+        #     name='handle_warning_orders_not_closed'
+        # )
 
     def handle_users_reply(self, update, context):
         user = context.user_data['user']
@@ -149,7 +151,64 @@ def handle_contacts_manager(update, context):
 # Функции для клиента
 def start_client(update, context):
     """Ответ для клиента"""
-    return ''  # TODO: придумать название
+    chat_id = update.message.chat_id
+    active_client = Client.objects.filter(
+        telegram_id=chat_id,
+        status=BotUser.Status.active
+    ).first()
+    if not active_client:
+        context.bot.send_message(
+            chat_id=chat_id,
+            text='Вы не являетесь нашим клиентом, пожалуйста обратитесь к менеджеру',
+        )
+        return 'START'
+    text = 'Здравствуйте, что вы хотите?'
+    reply_markup = ReplyKeyboardMarkup(
+        [
+            ['Хочу получить помощь'],
+        ],
+        one_time_keyboard=False, row_width=1, resize_keyboard=True
+    )
+    context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+    return 'HELP_TO_ORDER'
+
+
+def help_to_order_client(update, context):
+    chat_id = update.message.chat_id
+    client = Client.objects.select_related('tariff').prefetch_related('orders').get(telegram_id=chat_id)
+    orders_number_per_month = Order.objects.get_quantity_orders(client)
+
+    if orders_number_per_month >= client.tariff.orders_limit:
+        text = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
+        context.bot.send_message(chat_id=chat_id, text=text)
+        return 'START'
+    elif client.orders.get_in_work_not_informed():
+        # Здесь можно отправить уведомление, что подрядчик взялся за работу
+        text = 'У вас уже есть активная заявка, больше одной нельзя'
+        context.bot.send_message(chat_id=chat_id, text=text)
+        return 'START'
+    elif client.orders.get_available():
+        text = 'Ваша заявка ещё в обработке, пожалуйста ожидайте'
+        context.bot.send_message(chat_id=chat_id, text=text)
+        return 'START'
+    else:
+        with open('order_examples.txt', 'r') as file:
+            text = 'Вы можете оставить заявку в чате.\nПримеры заявок:\n'
+            order_examples = file.readlines()
+            for order_example in order_examples:
+                text += f'* {order_example}'
+            context.bot.send_message(chat_id=chat_id, text=text, reply_markup=ReplyKeyboardRemove())
+        return 'HANDLE_ORDER'
+
+
+def handle_order_client(update, context):
+    chat_id = update.message.chat_id
+    order_text = update.message.text
+    client = Client.objects.get(telegram_id=chat_id)
+    order, _ = Order.objects.get_or_create(client=client, task=order_text)
+    text = 'Заявку возьмут в течении часа/суток\nПришлите логин и пароль одним сообщением'
+    context.bot.send_message(chat_id=chat_id, text=text)
+
 
 
 # Функции для подрядчика

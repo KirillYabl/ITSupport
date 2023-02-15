@@ -2,6 +2,7 @@ from django.core.validators import MinLengthValidator, RegexValidator, MinValueV
 from django.db import models
 from django.db.transaction import atomic
 from django.utils import timezone
+from datetime import datetime
 
 
 class BotUserQuerySet(models.QuerySet):
@@ -171,6 +172,15 @@ class Owner(BotUser):
 
 
 class OrderQuerySet(models.QuerySet):
+    def get_quantity_orders(self, client):
+        current_datetime = datetime.now()
+        orders_in_month = self.filter(
+            status='закрыт',
+            client=client,
+            created_at__month=current_datetime.month,
+        )
+        return len(orders_in_month)
+
     def get_warning_orders_not_in_work(self):
         orders_not_in_work = self.objects.select_related('client').filter(
             status=self.Status.created,

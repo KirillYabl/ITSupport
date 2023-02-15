@@ -9,6 +9,8 @@ from tgbot_app.tg_bot import start_not_found
 from tgbot_app.tg_bot import start_owner
 from tgbot_app.tg_bot import handle_contacts_manager
 from tgbot_app.tg_bot import handle_buttons_owner
+from tgbot_app.tg_bot import help_to_order_client
+from tgbot_app.tg_bot import handle_order_client
 
 
 class Command(BaseCommand):
@@ -25,6 +27,8 @@ def start_bot():
         {
             'Клиент': {
                 'START': start_client,
+                'HELP_TO_ORDER': help_to_order_client,
+                'HANDLE_ORDER': handle_order_client,
             },
             'Менеджер': {
                 'START': start_manager,
