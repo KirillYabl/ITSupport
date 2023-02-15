@@ -1,6 +1,7 @@
 from typing import Callable
 
 from django.db.models import Q
+from django.db.transaction import atomic
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -48,7 +49,19 @@ class TgBot(object):
         self.updater.dispatcher.add_error_handler(self.error)
         self.job_queue = self.updater.job_queue
 
-        # self.job_queue.run_repeating(self.get_available_orders, interval=60, first=10, name='get_available_orders')
+        self.job_queue.run_repeating(
+            self.handle_warning_orders_not_in_work,
+            interval=60,
+            first=10,
+            name='handle_warning_orders_not_in_work'
+        )
+
+        self.job_queue.run_repeating(
+            self.handle_warning_orders_not_closed,
+            interval=60,
+            first=20,
+            name='handle_warning_orders_not_closed'
+        )
 
     def handle_users_reply(self, update, context):
         user = context.user_data['user']
@@ -84,8 +97,27 @@ class TgBot(object):
     def help_handler(self, update, context):
         update.message.reply_text("Используйте /start для того, что бы перезапустить бот")
 
-    def get_available_orders(self, context):
-        pass
+    def handle_warning_orders_not_in_work(self, context):
+        """
+        Каждому менеджеру отправить сообщение по каждому не взятому заказу
+        В сообщении указать задачу (поле task у заказа) и контакты заказчика (поле client.tg_nick у заказа) не забыв добавить @
+        """
+        warning_orders_not_in_work = Order.objects.get_warning_orders_not_in_work()
+        managers = Manager.objects.active()
+
+        warning_orders_not_in_work.update(not_in_work_manager_informed=True)  # это в конце вызывается
+
+    def handle_warning_orders_not_closed(self, context):
+        """
+        Каждому менеджеру отправить сообщение по каждому не выполненному заказу
+        В сообщении указать задачу (поле task у заказа) и
+        контакты заказчика (поле client.tg_nick у заказа) и
+        подрядчика (поле contractor.tg_nick у заказа) не забыв добавить @
+        """
+        warning_orders_not_closed = Order.objects.get_warning_orders_not_closed()
+        managers = Manager.objects.active()
+
+        warning_orders_not_closed.update(late_work_manager_informed=True)  # это в конце вызывается
 
 
 def start_not_found(update, context):
@@ -107,7 +139,7 @@ def handle_contacts(update, context):
     Если не нажал, то сообщить что неизвестный ввод, но все равно вернуть на старт
     """
     available_contractors = Contractor.objects.get_available()  # список доступных подрядчиков
-                                                                # по свойству tg_nick лежат их имена
+    # по свойству tg_nick лежат их имена
     return start_manager(update, context)
 
 
