@@ -47,6 +47,7 @@ INSTALLED_APPS = [
 
     'user_app',
     'support_app',
+    'tgbot_app',
 
     'rest_framework',
 ]

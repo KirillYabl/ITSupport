@@ -1,11 +1,11 @@
 from django.conf import settings
 from django.core.management import BaseCommand
 
-from user_app.tg_bot import TgBot
-from user_app.tg_bot import start_client
-from user_app.tg_bot import start_manager
-from user_app.tg_bot import start_contractor
-from user_app.tg_bot import start_not_found
+from tgbot_app.tg_bot import TgBot
+from tgbot_app.tg_bot import start_client
+from tgbot_app.tg_bot import start_manager
+from tgbot_app.tg_bot import start_contractor
+from tgbot_app.tg_bot import start_not_found
 
 
 class Command(BaseCommand):
