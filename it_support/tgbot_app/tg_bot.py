@@ -17,10 +17,12 @@ from support_app.models import Manager
 from support_app.models import Order
 
 from telegram.utils import request
+
+
 def get_user(func):
     def wrapper(update, context):
-        chat_id = update.message.chat_id
-        username = update.message.username
+        chat_id = update.effective_chat.id
+        username = update.effective_user.username
 
         try:
             user = BotUser.objects.get(Q(tg_nick=username) | Q(telegram_id=chat_id))
@@ -46,6 +48,8 @@ class TgBot(object):
         self.updater.dispatcher.add_error_handler(self.error)
         self.job_queue = self.updater.job_queue
 
+        # self.job_queue.run_repeating(self.get_available_orders, interval=60, first=10, name='get_available_orders')
+
     def handle_users_reply(self, update, context):
         user = context.user_data['user']
 
@@ -55,12 +59,12 @@ class TgBot(object):
 
         if update.message:
             user_reply = update.message.text
-            chat_id = update.message.chat_id
         elif update.callback_query:
             user_reply = update.callback_query.data
-            chat_id = update.callback_query.message.chat_id
         else:
             return
+
+        chat_id = update.effective_chat.id
 
         if user_reply == '/start':
             user_state = 'START'
@@ -79,22 +83,37 @@ class TgBot(object):
     def help_handler(self, update, context):
         update.message.reply_text("Используйте /start для того, что бы перезапустить бот")
 
+    def get_available_orders(self, context):
+        pass
+
 
 def start_not_found(update, context):
     """Ответ для неизвестного, что мы его не знаем ему нужно связаться с админами"""
     return 'START'
 
 
+# Функции для менеджера
 def start_manager(update, context):
     """Ответ для менеджера"""
     return 'HANDLE_CONTACTS'
 
 
+def handle_contacts(update, context):
+    """
+    Из модели подрядчика и заказа достать всех подрядчиков, у которых нет активных заказов.
+    Ответить списком их имен телеграм (в БД они хранятся без @, нужно добавить).
+    Если к базе не умеешь делать запросы ответь заглушкой, потом поправим
+    """
+    return start_manager(update, context)
+
+
+# Функции для клиента
 def start_client(update, context):
     """Ответ для клиента"""
     return ''  # TODO: придумать название
 
 
+# Функции для подрядчика
 def start_contractor(update, context):
     """Ответ для подрядчика"""
     return ''  # TODO: придумать название
