@@ -6,7 +6,9 @@ from tgbot_app.tg_bot import start_client
 from tgbot_app.tg_bot import start_manager
 from tgbot_app.tg_bot import start_contractor
 from tgbot_app.tg_bot import start_not_found
-from tgbot_app.tg_bot import handle_contacts
+from tgbot_app.tg_bot import start_owner
+from tgbot_app.tg_bot import handle_contacts_manager
+from tgbot_app.tg_bot import handle_buttons_owner
 
 
 class Command(BaseCommand):
@@ -26,10 +28,14 @@ def start_bot():
             },
             'Менеджер': {
                 'START': start_manager,
-                'HANDLE_CONTACTS': handle_contacts
+                'HANDLE_CONTACTS': handle_contacts_manager
             },
             'Подрядчик': {
                 'START': start_contractor,
+            },
+            'Владелец': {
+                'START': start_owner,
+                'HANDLE_BUTTONS': handle_buttons_owner
             },
             'unknown': {
                 'START': start_not_found,

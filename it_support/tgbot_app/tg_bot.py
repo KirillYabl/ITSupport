@@ -133,7 +133,7 @@ def start_manager(update, context):
     return 'HANDLE_CONTACTS'
 
 
-def handle_contacts(update, context):
+def handle_contacts_manager(update, context):
     """
     Из модели подрядчика и заказа достать всех подрядчиков, у которых нет активных заказов.
     Ответить списком их имен телеграм (в БД они хранятся без @, нужно добавить).
@@ -155,3 +155,12 @@ def start_client(update, context):
 def start_contractor(update, context):
     """Ответ для подрядчика"""
     return ''  # TODO: придумать название
+
+
+# Функции для владельца
+def start_owner(update, context):
+    return 'HANDLE_BUTTONS'
+
+
+def handle_buttons_owner(update, context):
+    return 'START'
