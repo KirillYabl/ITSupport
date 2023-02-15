@@ -68,6 +68,9 @@ class Client(BotUser):
     tariff = models.ForeignKey(Tariff, related_name='clients', on_delete=models.DO_NOTHING)
     paid = models.BooleanField('оплачен ли тариф', db_index=True)
 
+    def can_create_orders(self):
+        return self.paid
+
     class Meta:
         verbose_name = 'клиент'
         verbose_name_plural = 'клиенты'
@@ -86,6 +89,20 @@ class ContractorQuerySet(models.QuerySet):
 
 class Contractor(BotUser):
     objects = ContractorQuerySet.as_manager()
+
+    def delete_from_bot(self):
+        contractor_orders = Order.objects.filter(status=Order.Status.in_work, contractor=self)
+        with atomic():
+            contractor_orders.update(
+                status=Order.Status.created,
+                assigned_at=None,
+                contractor=None,
+                not_in_work_manager_informed=False,
+                late_work_manager_informed=False,
+                in_work_client_informed=False,
+            )
+            self.status = BotUser.Status.inactive
+            self.save()
 
     class Meta:
         verbose_name = 'подрядчик'
