@@ -170,7 +170,20 @@ def start_client(update, context):
 # Функции для подрядчика
 def start_contractor(update, context):
     """Ответ для подрядчика"""
-    return ''  # TODO: придумать название
+    chat_id = update.effective_chat.id
+    keyboard = [
+        [InlineKeyboardButton('Посмотреть заказы', callback_data='watch_orders')],
+        [InlineKeyboardButton('Написать заказчику', callback_data='send_message_to_client')],
+        [InlineKeyboardButton('Завершить заказ', callback_data='close_order')],
+        [InlineKeyboardButton('Мой заработок за месяц', callback_data='my_salary')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(text='Выберите действие', reply_markup=reply_markup, chat_id=chat_id)
+    return 'HANDLE_MENU_CONTRACTOR'
+
+
+def handle_menu_contractor(update, context):
+    return 'HANDLE_MENU_CONTRACTOR'
 
 
 # Функции для владельца
