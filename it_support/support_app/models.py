@@ -107,7 +107,7 @@ class Client(BotUser):
         return can_create_orders_count > created_orders_count
 
     def has_active_order(self):
-        return self.orders.filter(status=Order.Status.in_work).count() > 0
+        return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).count() > 0
 
     objects = ClientQuerySet.as_manager()
 
