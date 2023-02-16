@@ -1,6 +1,7 @@
-environs[django]==9.5.*
+environs[django]
 django==4.1.*
 django-debug-toolbar==3.8.*
 djangorestframework==3.14.*
-markdown==3.4.*
+markdown
+python-dateutil
 python-telegram-bot==13.15

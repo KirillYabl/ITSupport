@@ -1,7 +1,22 @@
 from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator, MaxValueValidator
 from django.db import models
+from django.db.models import Min, Max, Count
 from django.db.transaction import atomic
 from django.utils import timezone
+from dateutil import relativedelta
+
+
+def get_nearest_billing_start_date():
+    try:
+        billing_day = int(SystemSettings.objects.get('BILLING_DAY').parameter_value)
+    except (SystemSettings.DoesNotExist, ValueError):
+        billing_day = 1
+
+    now = timezone.now()
+    billing_date = timezone.datetime(year=now.year, month=now.month, day=billing_day)
+    if billing_date > now:
+        return billing_date - relativedelta.relativedelta(month=1)
+    return billing_date
 
 
 class BotUserQuerySet(models.QuerySet):
@@ -88,20 +103,9 @@ class Client(BotUser):
         return self.paid
 
     def has_limit_of_orders(self):
-        try:
-            billing_day = int(SystemSettings.objects.get('BILLING_DAY').parameter_value)
-        except (SystemSettings.DoesNotExist, ValueError):
-            billing_day = 1
+        nearest_billing_start_date = get_nearest_billing_start_date()
 
-        now = timezone.now()
-
-        if billing_day <= now.day:
-            min_date = timezone.datetime(now.year, now.month, now.day)
-        else:
-            before = now - timezone.timedelta(days=28)
-            min_date = timezone.datetime(before.year, before.month, billing_day)
-
-        created_orders_count = self.orders.filter(created_at__gte=min_date).count()
+        created_orders_count = self.orders.filter(created_at__gte=nearest_billing_start_date).count()
         can_create_orders_count = self.tariff.orders_limit
 
         return can_create_orders_count > created_orders_count
@@ -140,7 +144,7 @@ class Contractor(BotUser):
                 not_in_work_manager_informed=False,
                 late_work_manager_informed=False,
                 in_work_client_informed=False,
-                estimated_hours = None,
+                estimated_hours=None,
             )
             self.status = BotUser.Status.inactive
             self.save()
@@ -215,9 +219,56 @@ class OrderQuerySet(models.QuerySet):
     def get_closed_not_informed(self):
         return self.filter(status=Order.Status.closed, closed_client_informed=False)
 
-    def calculate_average_orders_in_month(self, year=None, month=None):
-        # TODO: посчитать сколько в среднем делается заказов в день в течении месяца с точностью до тарифа
-        pass
+    def calculate_average_orders_in_month(self):
+        nearest_billing_start_date = get_nearest_billing_start_date()
+        prev_billing_start_date = nearest_billing_start_date - relativedelta.relativedelta(month=1)
+
+        first_order_date = self.exclude(
+            status=Order.Status.cancelled
+        ).aggregate(dt=Min('created_at'))[0]['dt']
+
+        stats = []
+        while True:
+            total_orders_in_month = 0
+            clients_month_stat = self.exclude(
+                status=Order.Status.cancelled,
+            ).filter(
+                created_at__gt=prev_billing_start_date,
+                created_at__lte=prev_billing_start_date + relativedelta.relativedelta(month=1),
+            ).select_related('client__tg_nick').values('client__tg_nick').annotate(count_orders=Count('id'))
+
+            if prev_billing_start_date < first_order_date and not clients_month_stat:
+                break
+
+            for client_month_stat in clients_month_stat:
+                stats.append(
+                    [
+                        prev_billing_start_date,
+                        client_month_stat.client__tg_nick,
+                        client_month_stat.count_orders
+                    ]
+                )
+                total_orders_in_month += client_month_stat.count_orders
+            stats.append(
+                [
+                    prev_billing_start_date,
+                    'Всего',
+                    total_orders_in_month
+                ]
+            )
+            prev_billing_start_date -= relativedelta.relativedelta(month=1)
+        return stats
+
+    def calculate_billing(self):
+        nearest_billing_start_date = get_nearest_billing_start_date()
+        prev_billing_start_date = nearest_billing_start_date - relativedelta.relativedelta(month=1)
+
+        return self.exclude(
+            status=Order.Status.cancelled,
+        ).filter(
+            closed_at__gt=prev_billing_start_date,
+            closed_at__lte=prev_billing_start_date + relativedelta.relativedelta(month=1),
+        ).select_related('contractor').values('contractor').annotate(count_orders=Count('id'))
 
 
 class Order(models.Model):
