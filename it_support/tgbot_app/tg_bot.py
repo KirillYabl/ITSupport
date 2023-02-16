@@ -165,6 +165,16 @@ def handle_contacts_manager(update, context):
     """
     available_contractors = Contractor.objects.get_available()  # список доступных подрядчиков
     # по свойству tg_nick лежат их имена
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    if query.data == 'contacts_available_contractors':
+        message = ''
+        for name in available_contractors:
+            message += f'@{name.tg_nick}\n'
+        context.bot.send_message(text=message, chat_id=chat_id)
+    else:
+        message = 'неизвестный ввод'
+        context.bot.send_message(text=message, chat_id=chat_id)
     return start_manager(update, context)
 
 
