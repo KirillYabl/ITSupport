@@ -70,7 +70,7 @@ class TgBot(object):
         user = context.user_data['user']
 
         if user is None:
-            self.states_functions['unknown']['start'](update, context)
+            self.states_functions['unknown']['START'](update, context)
             return
 
         if update.message:
