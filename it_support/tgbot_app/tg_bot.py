@@ -229,8 +229,8 @@ def handle_order_client(update, context):
     reaction_time = 'суток' if reaction_time > 1 else 'часа'
     order = Order.objects.create(client=client, task=order_text)
     text = dedent(f'''\
-    Заявку возьмут в течении {reaction_time}\n\
-    Пришлите логин и пароль одним сообщением\nПример:\
+    Заявку возьмут в течении {reaction_time}.\
+    Пришлите логин и пароль одним сообщением.\nПример:\
     \n\nЛогин: Иван\nПароль: qwerty
     ''')
     context.bot.send_message(chat_id=chat_id, text=text)
