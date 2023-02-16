@@ -130,44 +130,27 @@ def start_not_found(update, context):
 
 # Функции для менеджера
 def start_manager(update, context):
-    """Ответ для менеджера с кнопками (пока одна)"""
+    """Старт для менеджера"""
     keyboard = [
-        [
-            InlineKeyboardButton(
-                "контакты доступных подрядчиков",
-                callback_data="contacts_available_contractors"
-            )
-        ],
+        [InlineKeyboardButton('Контакты доступных подрядчиков', callback_data='contacts_available_contractors')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     chat_id = update.effective_chat.id
-    context.bot.send_message(
-        text='Нажмите',
-        reply_markup=reply_markup,
-        chat_id=chat_id
-    )
-    return 'HANDLE_CONTACTS'
+    context.bot.send_message(text='Что вас интересует', reply_markup=reply_markup, chat_id=chat_id)
+    return 'HANDLE_MENU_MANAGER'
 
 
-def handle_contacts_manager(update, context):
-    """
-    Из модели подрядчика и заказа достать всех подрядчиков, у которых нет активных заказов.
-    Ответить списком их имен телеграм (в БД они хранятся без @, нужно добавить).
-    Проверить, что менеджер нажал кнопку
-    Если не нажал, то сообщить что неизвестный ввод, но все равно вернуть на старт
-    """
-    available_contractors = Contractor.objects.get_available()  # список доступных подрядчиков
-    # по свойству tg_nick лежат их имена
+def handle_menu_manager(update, context):
+    """Обработка кнопки 'Контакты доступных подрядчиков'"""
     chat_id = update.effective_chat.id
     query = update.callback_query
-    if query.data == 'contacts_available_contractors':
-        message = ''
-        for name in available_contractors:
-            message += f'@{name.tg_nick}\n'
-        context.bot.send_message(text=message, chat_id=chat_id)
-    else:
-        message = 'неизвестный ввод'
-        context.bot.send_message(text=message, chat_id=chat_id)
+
+    message = 'Я вас не понял, выберите из предложенных кнопок'
+    if query and query.data == 'contacts_available_contractors':
+        available_contractors = Contractor.objects.get_available()
+        message = '\n'.join([f'@{contractor.tg_nick}' for contractor in available_contractors])
+
+    context.bot.send_message(text=message, chat_id=chat_id)
     return start_manager(update, context)
 
 
@@ -206,27 +189,28 @@ def start_owner(update, context):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(text='Что вас интересует', reply_markup=reply_markup, chat_id=chat_id)
-    return 'HANDLE_BUTTONS'
+    return 'HANDLE_MENU_OWNER'
 
 
-def handle_buttons_owner(update, context):
+def handle_menu_owner(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    if query.data == 'contractor_billing_prev_month':
+
+    message = 'Я вас не понял, нажмите одну из предложенных кнопок'
+    if query and query.data == 'contractor_billing_prev_month':
         billing = [
             f'{contractor_billing["contractor__tg_nick"]}\t{contractor_billing["count_orders"]}'
             for contractor_billing
             in Order.objects.calculate_billing()
         ]
         message = 'Подрядчик\tВыполненных заказов\n' + '-' * 50 + '\n' + '\n'.join(billing)
-    elif query.data.startswith('orders_stats'):
+    elif query and query.data.startswith('orders_stats'):
         stats = [
             f'{stat[0]}\t{stat[1]}\t{stat[2]}'
             for stat
             in Order.objects.calculate_average_orders_in_month()
         ]
         message = 'Начало биллинга\tКлиент\tЧисло заказов\n' + '-' * 50 + '\n' + '\n'.join(stats)
-    else:
-        message = 'Я вас не понял, нажмите одну из предложенных кнопок'
+
     context.bot.send_message(text=message, chat_id=chat_id)
     return start_owner(update, context)

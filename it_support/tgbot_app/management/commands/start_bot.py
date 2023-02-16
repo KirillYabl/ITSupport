@@ -6,13 +6,13 @@ from tgbot_app.tg_bot import TgBot
 from tgbot_app.tg_bot import start_client
 
 from tgbot_app.tg_bot import start_manager
-from tgbot_app.tg_bot import handle_contacts_manager
+from tgbot_app.tg_bot import handle_menu_manager
 
 from tgbot_app.tg_bot import start_contractor
 from tgbot_app.tg_bot import handle_menu_contractor
 
 from tgbot_app.tg_bot import start_owner
-from tgbot_app.tg_bot import handle_buttons_owner
+from tgbot_app.tg_bot import handle_menu_owner
 
 from tgbot_app.tg_bot import start_not_found
 
@@ -34,7 +34,7 @@ def start_bot():
             },
             'Менеджер': {
                 'START': start_manager,
-                'HANDLE_CONTACTS': handle_contacts_manager
+                'HANDLE_MENU_MANAGER': handle_menu_manager
             },
             'Подрядчик': {
                 'START': start_contractor,
@@ -42,7 +42,7 @@ def start_bot():
             },
             'Владелец': {
                 'START': start_owner,
-                'HANDLE_BUTTONS': handle_buttons_owner
+                'HANDLE_MENU_OWNER': handle_menu_owner
             },
             'unknown': {
                 'START': start_not_found,
