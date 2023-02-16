@@ -131,6 +131,21 @@ def start_not_found(update, context):
 # Функции для менеджера
 def start_manager(update, context):
     """Ответ для менеджера с кнопками (пока одна)"""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "контакты доступных подрядчиков",
+                callback_data="contacts_available_contractors"
+            )
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    chat_id = update.effective_chat.id
+    context.bot.send_message(
+        text='Нажмите',
+        reply_markup=reply_markup,
+        chat_id=chat_id
+    )
     return 'HANDLE_CONTACTS'
 
 
