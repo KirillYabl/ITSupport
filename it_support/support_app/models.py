@@ -92,7 +92,7 @@ class Tariff(models.Model):
         return self.name
 
 
-class ClientQuerySet(models.QuerySet):
+class ClientQuerySet(BotUserQuerySet):
     def calculate_orders(self, year=None, month=None):
         # TODO: посчитать по каждому заказчику число заказов за месяц
         pass
@@ -129,7 +129,7 @@ class Client(BotUser):
         return f'{self.tg_nick} ({self.status})'
 
 
-class ContractorQuerySet(models.QuerySet):
+class ContractorQuerySet(BotUserQuerySet):
     def get_available(self):
         not_available_contractors = Order.objects.select_related('contractor').filter(
             status=Order.Status.in_work).values('contractor').distinct()
@@ -163,7 +163,13 @@ class Contractor(BotUser):
         return f'{self.tg_nick} ({self.status})'
 
 
+class ManagerQuerySet(BotUserQuerySet):
+    pass
+
+
 class Manager(BotUser):
+    objects = ManagerQuerySet.as_manager()
+
     class Meta:
         verbose_name = 'менеджер'
         verbose_name_plural = 'менеджеры'
