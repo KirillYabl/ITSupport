@@ -181,12 +181,7 @@ def help_to_order_client(update, context):
     chat_id = update.effective_chat.id
     client = context.user_data['user'].client
 
-    if client.orders.get_in_work_not_informed():
-        # Здесь можно отправить уведомление, что подрядчик взялся за работу
-        text = 'У вас уже есть активная заявка, больше одной нельзя'
-        context.bot.send_message(chat_id=chat_id, text=text)
-        return 'START'
-    elif not client.has_limit_of_orders():
+    if not client.has_limit_of_orders():
         text = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
         context.bot.send_message(chat_id=chat_id, text=text)
         return 'START'
@@ -208,14 +203,13 @@ def handle_order_client(update, context):
     chat_id = update.effective_chat.id
     order_text = update.message.text
     client = context.user_data['user'].client
-    reaction_time = int(client.tariff.reaction_time_minutes / 60)
-    reaction_time = 'суток' if reaction_time > 1 else 'часа'
+    reaction_time_hours = int(client.tariff.reaction_time_minutes / 60)
     order = Order.objects.create(client=client, task=order_text)
-    text = dedent(f'''\
-    Заявку возьмут в течении {reaction_time}.\
+    text = '''\
+    Количество часов, через которое возьмут вашу заявку: {}.\
     Пришлите логин и пароль одним сообщением.\nПример:\
     \n\nЛогин: Иван\nПароль: qwerty
-    ''')
+    '''.format(reaction_time_hours)
     context.bot.send_message(chat_id=chat_id, text=text)
 
 
