@@ -108,9 +108,9 @@ class TgBot(object):
         В сообщении указать задачу (поле task у заказа) и контакты заказчика (поле client.tg_nick у заказа) не забыв добавить @
         """
         warning_orders_not_in_work = Order.objects.get_warning_orders_not_in_work()
-        managers = Manager.objects.active()
+        # managers = Manager.objects.active()
 
-        warning_orders_not_in_work.update(not_in_work_manager_informed=True)  # это в конце вызывается
+        # warning_orders_not_in_work.update(not_in_work_manager_informed=True)  # это в конце вызывается
 
     def handle_warning_orders_not_closed(self, context):
         """
@@ -120,9 +120,9 @@ class TgBot(object):
         подрядчика (поле contractor.tg_nick у заказа) не забыв добавить @
         """
         warning_orders_not_closed = Order.objects.get_warning_orders_not_closed()
-        managers = Manager.objects.active()
+        # managers = Manager.objects.active()
 
-        warning_orders_not_closed.update(late_work_manager_informed=True)  # это в конце вызывается
+        # warning_orders_not_closed.update(late_work_manager_informed=True)  # это в конце вызывается
 
 
 def start_not_found(update, context):
@@ -133,6 +133,21 @@ def start_not_found(update, context):
 # Функции для менеджера
 def start_manager(update, context):
     """Ответ для менеджера с кнопками (пока одна)"""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "контакты доступных подрядчиков",
+                callback_data="contacts_available_contractors"
+            )
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    chat_id = update.effective_chat.id
+    context.bot.send_message(
+        text='Нажмите',
+        reply_markup=reply_markup,
+        chat_id=chat_id
+    )
     return 'HANDLE_CONTACTS'
 
 
@@ -214,20 +229,52 @@ def handle_order_client(update, context):
 # Функции для подрядчика
 def start_contractor(update, context):
     """Ответ для подрядчика"""
-    return ''  # TODO: придумать название
+    chat_id = update.effective_chat.id
+    keyboard = [
+        [InlineKeyboardButton('Посмотреть заказы', callback_data='watch_orders')],
+        [InlineKeyboardButton('Написать заказчику', callback_data='send_message_to_client')],
+        [InlineKeyboardButton('Завершить заказ', callback_data='close_order')],
+        [InlineKeyboardButton('Мой заработок за месяц', callback_data='my_salary')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(text='Выберите действие', reply_markup=reply_markup, chat_id=chat_id)
+    return 'HANDLE_MENU_CONTRACTOR'
+
+
+def handle_menu_contractor(update, context):
+    return 'HANDLE_MENU_CONTRACTOR'
 
 
 # Функции для владельца
 def start_owner(update, context):
+    chat_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton('Биллинг подрядчиков за прошлый месяц', callback_data='contractor_billing_prev_month')],
         [InlineKeyboardButton('Статистика по заказам', callback_data='orders_stats')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    chat_id = update.effective_chat.id
     context.bot.send_message(text='Что вас интересует', reply_markup=reply_markup, chat_id=chat_id)
     return 'HANDLE_BUTTONS'
 
 
 def handle_buttons_owner(update, context):
-    return 'START'
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    if query.data == 'contractor_billing_prev_month':
+        billing = [
+            f'{contractor_billing["contractor__tg_nick"]}\t{contractor_billing["count_orders"]}'
+            for contractor_billing
+            in Order.objects.calculate_billing()
+        ]
+        message = 'Подрядчик\tВыполненных заказов\n' + '-' * 50 + '\n' + '\n'.join(billing)
+    elif query.data.startswith('orders_stats'):
+        stats = [
+            f'{stat[0]}\t{stat[1]}\t{stat[2]}'
+            for stat
+            in Order.objects.calculate_average_orders_in_month()
+        ]
+        message = 'Начало биллинга\tКлиент\tЧисло заказов\n' + '-' * 50 + '\n' + '\n'.join(stats)
+    else:
+        message = 'Я вас не понял, нажмите одну из предложенных кнопок'
+    context.bot.send_message(text=message, chat_id=chat_id)
+    return start_owner(update, context)

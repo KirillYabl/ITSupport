@@ -1,8 +1,28 @@
-from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator
+from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator, MaxValueValidator
 from django.db import models
+from django.db.models import Min, Max, Count
 from django.db.transaction import atomic
 from django.utils import timezone
 from datetime import datetime
+from dateutil import relativedelta
+
+
+def get_nearest_billing_start_date():
+    try:
+        billing_day = int(SystemSettings.objects.get('BILLING_DAY').parameter_value)
+    except (SystemSettings.DoesNotExist, ValueError):
+        billing_day = 1
+
+    now = timezone.now()
+    billing_date = timezone.datetime(
+        year=now.year,
+        month=now.month,
+        day=billing_day,
+        tzinfo=timezone.get_current_timezone()
+    )
+    if billing_date > now:
+        return billing_date - relativedelta.relativedelta(months=1)
+    return billing_date
 
 
 class BotUserQuerySet(models.QuerySet):
@@ -89,26 +109,15 @@ class Client(BotUser):
         return self.paid
 
     def has_limit_of_orders(self):
-        try:
-            billing_day = int(SystemSettings.objects.get('BILLING_DAY').parameter_value)
-        except (SystemSettings.DoesNotExist, ValueError):
-            billing_day = 1
+        nearest_billing_start_date = get_nearest_billing_start_date()
 
-        now = timezone.now()
-
-        if billing_day <= now.day:
-            min_date = timezone.datetime(now.year, now.month, now.day)
-        else:
-            before = now - timezone.timedelta(days=28)
-            min_date = timezone.datetime(before.year, before.month, billing_day)
-
-        created_orders_count = self.orders.filter(created_at__gte=min_date).count()
+        created_orders_count = self.orders.filter(created_at__gte=nearest_billing_start_date).count()
         can_create_orders_count = self.tariff.orders_limit
 
         return can_create_orders_count > created_orders_count
 
     def has_active_order(self):
-        return self.orders.filter(status=Order.Status.in_work).count() > 0
+        return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).count() > 0
 
     objects = ClientQuerySet.as_manager()
 
@@ -124,7 +133,7 @@ class ContractorQuerySet(models.QuerySet):
     def get_available(self):
         not_available_contractors = Order.objects.select_related('contractor').filter(
             status=Order.Status.in_work).values('contractor').distinct()
-        not_available_contractor_ids = [contractor.id for contractor in not_available_contractors]
+        not_available_contractor_ids = [contractor['contractor'] for contractor in not_available_contractors]
         return self.exclude(id__in=not_available_contractor_ids)
 
 
@@ -141,6 +150,7 @@ class Contractor(BotUser):
                 not_in_work_manager_informed=False,
                 late_work_manager_informed=False,
                 in_work_client_informed=False,
+                estimated_hours=None,
             )
             self.status = BotUser.Status.inactive
             self.save()
@@ -182,8 +192,8 @@ class OrderQuerySet(models.QuerySet):
         return len(orders_in_month)
 
     def get_warning_orders_not_in_work(self):
-        orders_not_in_work = self.objects.select_related('client').filter(
-            status=self.Status.created,
+        orders_not_in_work = self.select_related('client').filter(
+            status=Order.Status.created,
             not_in_work_manager_informed=False,
         )
         warning_orders = []
@@ -201,8 +211,8 @@ class OrderQuerySet(models.QuerySet):
         return warning_orders
 
     def get_warning_orders_not_closed(self):
-        orders_not_closed = self.objects.select_related('client', 'contractor').filter(
-            status=self.Status.in_work,
+        orders_not_closed = self.select_related('client', 'contractor').filter(
+            status=Order.Status.in_work,
             late_work_manager_informed=False,
         )
         warning_orders = []
@@ -224,9 +234,56 @@ class OrderQuerySet(models.QuerySet):
     def get_closed_not_informed(self):
         return self.filter(status=Order.Status.closed, closed_client_informed=False)
 
-    def calculate_average_orders_in_month(self, year=None, month=None):
-        # TODO: посчитать сколько в среднем делается заказов в день в течении месяца с точностью до тарифа
-        pass
+    def calculate_average_orders_in_month(self):
+        nearest_billing_start_date = get_nearest_billing_start_date()
+        prev_billing_start_date = nearest_billing_start_date - relativedelta.relativedelta(months=1)
+
+        first_order_date = self.exclude(
+            status=Order.Status.cancelled
+        ).aggregate(dt=Min('created_at'))['dt']
+
+        stats = []
+        while True:
+            total_orders_in_month = 0
+            clients_month_stat = self.exclude(
+                status=Order.Status.cancelled,
+            ).filter(
+                created_at__gt=prev_billing_start_date,
+                created_at__lte=prev_billing_start_date + relativedelta.relativedelta(months=1),
+            ).select_related('client__tg_nick').values('client__tg_nick').annotate(count_orders=Count('id'))
+
+            if prev_billing_start_date < first_order_date and not clients_month_stat:
+                break
+
+            for client_month_stat in clients_month_stat:
+                stats.append(
+                    [
+                        prev_billing_start_date,
+                        client_month_stat['client__tg_nick'],
+                        client_month_stat['count_orders']
+                    ]
+                )
+                total_orders_in_month += client_month_stat['count_orders']
+            stats.append(
+                [
+                    prev_billing_start_date,
+                    'Всего',
+                    total_orders_in_month
+                ]
+            )
+            prev_billing_start_date -= relativedelta.relativedelta(months=1)
+        return stats
+
+    def calculate_billing(self):
+        nearest_billing_start_date = get_nearest_billing_start_date()
+        prev_billing_start_date = nearest_billing_start_date - relativedelta.relativedelta(months=1)
+
+        return self.exclude(
+            status=Order.Status.cancelled,
+        ).filter(
+            closed_at__gt=prev_billing_start_date,
+            closed_at__lte=prev_billing_start_date + relativedelta.relativedelta(month=2),  # не понял почему, но 2
+        ).select_related('contractor').values('contractor__tg_nick').annotate(count_orders=Count('id'))
 
 
 class Order(models.Model):
@@ -287,6 +344,14 @@ class Order(models.Model):
         default=False,
     )
 
+    creds = models.CharField('доступы к сервису', max_length=2000, blank=True)
+    estimated_hours = models.IntegerField(
+        'оцененное время выполнения в часах',
+        validators=[MinValueValidator(1), MaxValueValidator(24)],
+        null=True,
+        blank=True,
+    )
+
     objects = OrderQuerySet.as_manager()
 
     def take_in_work(self, contractor):
@@ -300,13 +365,23 @@ class Order(models.Model):
         with atomic():
             self.closed_at = timezone.now()
             self.status = self.Status.closed
+            self.creds = ''
             self.save()
 
     def cancel_work(self):
         with atomic():
             self.closed_at = timezone.now()
             self.status = self.Status.cancelled
+            self.creds = ''
             self.save()
+
+    def encode_creds(self, creds):
+        # TODO: написать шифрование доступов
+        return creds
+
+    def decode_creds(self, creds):
+        # TODO: написать шифрование доступов
+        return creds
 
     class Meta:
         verbose_name = 'заказ'

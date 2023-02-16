@@ -2,15 +2,21 @@ from django.conf import settings
 from django.core.management import BaseCommand
 
 from tgbot_app.tg_bot import TgBot
+
 from tgbot_app.tg_bot import start_client
+
 from tgbot_app.tg_bot import start_manager
-from tgbot_app.tg_bot import start_contractor
-from tgbot_app.tg_bot import start_not_found
-from tgbot_app.tg_bot import start_owner
 from tgbot_app.tg_bot import handle_contacts_manager
+
+from tgbot_app.tg_bot import start_contractor
+from tgbot_app.tg_bot import handle_menu_contractor
+
+from tgbot_app.tg_bot import start_owner
 from tgbot_app.tg_bot import handle_buttons_owner
 from tgbot_app.tg_bot import help_to_order_client
 from tgbot_app.tg_bot import handle_order_client
+
+from tgbot_app.tg_bot import start_not_found
 
 
 class Command(BaseCommand):
@@ -36,6 +42,7 @@ def start_bot():
             },
             'Подрядчик': {
                 'START': start_contractor,
+                'HANDLE_MENU_CONTRACTOR': handle_menu_contractor,
             },
             'Владелец': {
                 'START': start_owner,
