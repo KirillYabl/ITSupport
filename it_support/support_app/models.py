@@ -1,4 +1,4 @@
-from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator
+from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.transaction import atomic
 from django.utils import timezone
@@ -140,6 +140,7 @@ class Contractor(BotUser):
                 not_in_work_manager_informed=False,
                 late_work_manager_informed=False,
                 in_work_client_informed=False,
+                estimated_hours = None,
             )
             self.status = BotUser.Status.inactive
             self.save()
@@ -277,6 +278,14 @@ class Order(models.Model):
         default=False,
     )
 
+    creds = models.CharField('доступы к сервису', max_length=2000, blank=True)
+    estimated_hours = models.IntegerField(
+        'оцененное время выполнения в часах',
+        validators=[MinValueValidator(1), MaxValueValidator(24)],
+        null=True,
+        blank=True,
+    )
+
     objects = OrderQuerySet.as_manager()
 
     def take_in_work(self, contractor):
@@ -290,13 +299,23 @@ class Order(models.Model):
         with atomic():
             self.closed_at = timezone.now()
             self.status = self.Status.closed
+            self.creds = ''
             self.save()
 
     def cancel_work(self):
         with atomic():
             self.closed_at = timezone.now()
             self.status = self.Status.cancelled
+            self.creds = ''
             self.save()
+
+    def encode_creds(self, creds):
+        # TODO: написать шифрование доступов
+        return creds
+
+    def decode_creds(self, creds):
+        # TODO: написать шифрование доступов
+        return creds
 
     class Meta:
         verbose_name = 'заказ'
