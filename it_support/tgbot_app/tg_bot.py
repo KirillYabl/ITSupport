@@ -179,9 +179,10 @@ def start_client(update, context):
 
 # Функции для подрядчика
 def start_contractor(update, context):
-    """Ответ для подрядчика"""
+    """Стартовая функция подрядчика"""
     chat_id = update.effective_chat.id
     keyboard = [
+        [InlineKeyboardButton('Как это работает?', callback_data='how_contractor_bot_work')],
         [InlineKeyboardButton('Посмотреть заказы', callback_data='watch_orders')],
         [InlineKeyboardButton('Написать заказчику', callback_data='send_message_to_client')],
         [InlineKeyboardButton('Завершить заказ', callback_data='close_order')],
