@@ -19,7 +19,7 @@ from support_app.models import Manager
 from support_app.models import Order
 
 from telegram.utils import request
-from pprint import pprint
+from textwrap import dedent
 
 
 def get_user(func):
@@ -127,6 +127,11 @@ class TgBot(object):
 
 def start_not_found(update, context):
     """Ответ для неизвестного, что мы его не знаем ему нужно связаться с админами"""
+    chat_id = update.effective_chat.id
+    context.bot.send_message(
+            chat_id=chat_id,
+            text='Вы не являетесь нашим клиентом, пожалуйста обратитесь к менеджеру',
+        )
     return 'START'
 
 
@@ -166,17 +171,8 @@ def handle_contacts_manager(update, context):
 # Функции для клиента
 def start_client(update, context):
     """Ответ для клиента"""
-    chat_id = update.message.chat_id
-    active_client = Client.objects.filter(
-        telegram_id=chat_id,
-        status=BotUser.Status.active
-    ).first()
-    if not active_client:
-        context.bot.send_message(
-            chat_id=chat_id,
-            text='Вы не являетесь нашим клиентом, пожалуйста обратитесь к менеджеру',
-        )
-        return 'START'
+    chat_id = update.effective_chat.id
+    client = context.user_data['user'].client
     text = 'Здравствуйте, что вы хотите?'
     reply_markup = ReplyKeyboardMarkup(
         [
@@ -189,20 +185,19 @@ def start_client(update, context):
 
 
 def help_to_order_client(update, context):
-    chat_id = update.message.chat_id
-    client = Client.objects.select_related('tariff').prefetch_related('orders').get(telegram_id=chat_id)
-    orders_number_per_month = Order.objects.get_quantity_orders(client)
+    chat_id = update.effective_chat.id
+    client = context.user_data['user'].client
 
-    if orders_number_per_month >= client.tariff.orders_limit:
-        text = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
-        context.bot.send_message(chat_id=chat_id, text=text)
-        return 'START'
-    elif client.orders.get_in_work_not_informed():
+    if client.orders.get_in_work_not_informed():
         # Здесь можно отправить уведомление, что подрядчик взялся за работу
         text = 'У вас уже есть активная заявка, больше одной нельзя'
         context.bot.send_message(chat_id=chat_id, text=text)
         return 'START'
-    elif client.orders.get_available():
+    elif not client.has_limit_of_orders():
+        text = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
+        context.bot.send_message(chat_id=chat_id, text=text)
+        return 'START'
+    elif client.has_active_order():
         text = 'Ваша заявка ещё в обработке, пожалуйста ожидайте'
         context.bot.send_message(chat_id=chat_id, text=text)
         return 'START'
@@ -217,11 +212,17 @@ def help_to_order_client(update, context):
 
 
 def handle_order_client(update, context):
-    chat_id = update.message.chat_id
+    chat_id = update.effective_chat.id
     order_text = update.message.text
-    client = Client.objects.get(telegram_id=chat_id)
-    order, _ = Order.objects.get_or_create(client=client, task=order_text)
-    text = 'Заявку возьмут в течении часа/суток\nПришлите логин и пароль одним сообщением'
+    client = context.user_data['user'].client
+    reaction_time = int(client.tariff.reaction_time_minutes / 60)
+    reaction_time = 'суток' if reaction_time > 1 else 'часа'
+    order = Order.objects.create(client=client, task=order_text)
+    text = dedent(f'''\
+    Заявку возьмут в течении {reaction_time}\n\
+    Пришлите логин и пароль одним сообщением\nПример:\
+    \n\nЛогин: Иван\nПароль: qwerty
+    ''')
     context.bot.send_message(chat_id=chat_id, text=text)
 
 
