@@ -12,7 +12,6 @@ from tgbot_app.tg_bot import start_contractor
 from tgbot_app.tg_bot import handle_menu_contractor
 
 from tgbot_app.tg_bot import start_owner
-from tgbot_app.tg_bot import handle_buttons_owner
 from tgbot_app.tg_bot import help_to_order_client
 from tgbot_app.tg_bot import handle_order_client
 from tgbot_app.tg_bot import handle_menu_owner

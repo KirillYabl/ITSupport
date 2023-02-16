@@ -54,19 +54,19 @@ class TgBot(object):
         self.job_queue = self.updater.job_queue
         # Что-то с закомментированным кодом ниже не так, присылает левые данные
 
-        # self.job_queue.run_repeating(
-        #     self.handle_warning_orders_not_in_work,
-        #     interval=60,
-        #     first=10,
-        #     name='handle_warning_orders_not_in_work'
-        # )
+        self.job_queue.run_repeating(
+            self.handle_warning_orders_not_in_work,
+            interval=60,
+            first=10,
+            name='handle_warning_orders_not_in_work'
+        )
 
-        # self.job_queue.run_repeating(
-        #     self.handle_warning_orders_not_closed,
-        #     interval=60,
-        #     first=20,
-        #     name='handle_warning_orders_not_closed'
-        # )
+        self.job_queue.run_repeating(
+            self.handle_warning_orders_not_closed,
+            interval=60,
+            first=20,
+            name='handle_warning_orders_not_closed'
+        )
 
     def handle_users_reply(self, update, context):
         user = context.user_data['user']
