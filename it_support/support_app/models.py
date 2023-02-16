@@ -154,6 +154,16 @@ class Contractor(BotUser):
             self.status = BotUser.Status.inactive
             self.save()
 
+    def has_order_in_work(self):
+        return len(self.orders.filter(status=Order.Status.in_work)) > 0
+
+    def get_order_in_work(self):
+        return self.orders.filter(status=Order.Status.in_work).first()
+
+    def get_closed_in_actual_billing_orders(self):
+        nearest_billing_start_date = get_nearest_billing_start_date()
+        return self.orders.filter(closed_at__gte=nearest_billing_start_date)
+
     class Meta:
         verbose_name = 'подрядчик'
         verbose_name_plural = 'подрядчики'
@@ -222,7 +232,7 @@ class OrderQuerySet(models.QuerySet):
         return warning_orders
 
     def get_available(self):
-        return self.filter(status=Order.Status.created)
+        return self.filter(status=Order.Status.created).order_by('created_at')
 
     def get_in_work_not_informed(self):
         return self.filter(status=Order.Status.in_work, in_work_client_informed=False)

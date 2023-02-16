@@ -1,3 +1,4 @@
+from textwrap import dedent
 from typing import Callable
 
 from django.db.models import Q
@@ -177,7 +178,66 @@ def start_contractor(update, context):
 
 
 def handle_menu_contractor(update, context):
-    return 'HANDLE_MENU_CONTRACTOR'
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    contractor = context.user_data['user'].contractor
+
+    message = 'Я вас не понял, нажмите одну из предложенных кнопок'
+    if query and query.data == 'how_contractor_bot_work':
+        message = dedent(f'''
+        При появлении новых заказов вам будет приходить уведомление, 
+        где вы можете взять заказ в работу
+                             
+        Также текущие доступные заказы вы можете посотреть по кнопке "Посмотреть заказы"
+                             
+        Когда вы возьмете заказ вам придет логин и пароль от админки клиента
+                             
+        Если у вас возникнут вопросы, вы всегда можете задать их заказчику по кнопке "Написать заказчику"
+        
+        Как только заказчик вам ответит вам придет уведомление
+        
+        После завершения заказа нажмите на кнопку "Завершить заказ"
+        
+        Посмотреть сколько заказов вы выполнили и заработает при очередном финансовом 
+        периоде вы можете по кнопке "Мой заработок за месяц" 
+        ''')
+    elif query and query.data == 'watch_orders':
+        available_orders = Order.objects.get_available()
+        if not available_orders:
+            message = 'Нет заказов, которые можно взять в работу'
+        for order in available_orders:
+            message = dedent(f'''Задание:
+            {order.task}
+            
+            Доступы к сайту:
+            {order.creds}
+            ''')
+            keyboard = [[InlineKeyboardButton('Взять в работу', callback_data=f'take_order_{order.pk}')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
+            return 'HANDLE_MENU_CONTRACTOR'
+    elif query and query.data == 'send_message_to_client':
+        message = 'У вас нет активного заказа'
+        if contractor.has_order_in_work():
+            message = 'Напишите сообщение клиенту'
+            context.bot.send_message(text=message, chat_id=chat_id)
+            return 'WAIT_MESSAGE_TO_CLIENT_CONTRACTOR'
+    elif query and query.data == 'close_order':
+        message = 'У вас нет активного заказа'
+        if contractor.has_order_in_work():
+            contractor.get_order_in_work().close_work()
+            message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
+    elif query and query.data == 'my_salary':
+        closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
+        message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {closed_orders_count * 500}'
+
+    context.bot.send_message(text=message, chat_id=chat_id)
+
+    return start_contractor(update, context)
+
+
+def wait_message_to_client_contractor(update, context):
+    return start_contractor(update, context)
 
 
 # Функции для владельца
