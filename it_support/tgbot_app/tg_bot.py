@@ -19,8 +19,6 @@ from support_app.models import Client
 from support_app.models import Manager
 from support_app.models import Order
 
-from telegram.utils import request
-
 
 def get_user(func):
     def wrapper(update, context):
@@ -28,9 +26,17 @@ def get_user(func):
         username = update.effective_user.username
 
         try:
-            user = BotUser.objects.get(
-                Q(status=BotUser.Status.active) & (Q(tg_nick=username) | Q(telegram_id=chat_id))
-            )
+            active_users = BotUser.objects.active()
+            try:
+                user = active_users.get(telegram_id=chat_id)
+                if user.tg_nick != username:
+                    user.tg_nick = username
+                    user.save()
+            except BotUser.DoesNotExist:
+                user = active_users.get(tg_nick=username)
+                if user.telegram_id != chat_id:
+                    user.telegram_id = chat_id
+                    user.save()
         except BotUser.DoesNotExist:
             user = None
 
