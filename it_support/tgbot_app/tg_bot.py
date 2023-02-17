@@ -276,7 +276,7 @@ def wait_message_to_contractor_client(update: Update, context: CallbackContext) 
         message = 'Сообщение успешно отправлено, когда подрядчик ответит вам придет уведомление'
     context.bot.send_message(text=message, chat_id=chat_id)
 
-    return start_contractor(update, context)
+    return start_client(update, context)
 
 
 def waiting_order_task(update: Update, context: CallbackContext) -> str:
