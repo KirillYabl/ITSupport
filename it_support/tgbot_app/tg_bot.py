@@ -126,7 +126,7 @@ class TgBot(object):
         update.message.reply_text("Используйте /start для того, что бы перезапустить бот")
 
     def handle_warning_orders_not_in_work(self, context: CallbackContext) -> None:
-        """If there are an overdue orders they should be sended to every manager"""
+        """If there are an overdue created orders they should be sent to every manager"""
         warning_orders_not_in_work = Order.objects.get_warning_orders_not_in_work()
         if not warning_orders_not_in_work:  # если не будет просроченных заказов, то не отправляем
             return
@@ -142,31 +142,21 @@ class TgBot(object):
         warning_orders_not_in_work.update(not_in_work_manager_informed=True)
 
     def handle_warning_orders_not_closed(self, context: CallbackContext) -> None:
-        """
-        Каждому менеджеру отправить сообщение по каждому не выполненному заказу
-        В сообщении указать задачу (поле task у заказа) и
-        контакты заказчика (поле client.tg_nick у заказа) и
-        подрядчика (поле contractor.tg_nick у заказа) не забыв добавить @
-        """
+        """If there are an overdue in work orders they should be sent to every manager"""
         warning_orders_not_closed = Order.objects.get_warning_orders_not_closed()
         if not warning_orders_not_closed:  # если не будет просроченных заказов, то не отправляем
             return
         message = 'Есть заказы, которые не выполнены\n\n' + '\n'.join(
             [
-                (
-                    f'Задача: {order.task}\n'
-                    f'Контакт подрядчика: @{order.contractor.tg_nick}'
-                    f'\nКонтакт клиента: @{order.client.tg_nick}\n\n'
-                 )
+                f'Задача: {order.task}\nКонтакт подрядчика: @{order.contractor.tg_nick}\n' +
+                'Контакт клиента: @{order.client.tg_nick}\n\n'
                 for order in warning_orders_not_closed
             ]
         )
         managers = Manager.objects.active()
         for manager in managers:
             context.bot.send_message(text=message, chat_id=manager.telegram_id)
-        warning_orders_not_closed.update(
-            late_work_manager_informed=True)  # это в конце вызывается
-        warning_orders_not_closed.update(late_work_manager_informed=True)  # это в конце вызывается
+        warning_orders_not_closed.update(late_work_manager_informed=True)
 
 
 def start_not_found(update: Update, context: CallbackContext) -> str:
