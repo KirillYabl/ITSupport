@@ -224,7 +224,7 @@ def handle_menu_contractor(update, context):
             Доступы к сайту:
             {order.creds}
             ''')
-            keyboard = [[InlineKeyboardButton('Взять в работу', callback_data=f'take_order_{order.pk}')]]
+            keyboard = [[InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
             return 'HANDLE_MENU_CONTRACTOR'
@@ -242,6 +242,25 @@ def handle_menu_contractor(update, context):
     elif query and query.data == 'my_salary':
         closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
         message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {closed_orders_count * 500}'
+    elif query and query.data.startswith('take_order'):
+        order_pk = query.data.split('|')[-1]
+        bad_scenario = False
+        try:
+            order = Order.objects.get(pk=int(order_pk))
+        except (Order.DoesNotExist, ValueError):
+            order = None
+            message = 'Что-то пошло не так, заказ не найден, попробуйте снова получить список заказов'
+            bad_scenario = True
+
+        if order is not None and order.status != Order.Status.created:
+            message = 'К сожалению заказ уже взяли, попробуйте снова получить список заказов'
+            bad_scenario = True
+
+        if not bad_scenario:
+            message = 'Пришлите приблизительную оценку требуемого на выполнения времени в часах'
+            context.user_data['order_in_process'] = order
+            context.bot.send_message(text=message, chat_id=chat_id)
+            return 'WAIT_ESTIMATE_CONTRACTOR'
 
     context.bot.send_message(text=message, chat_id=chat_id)
 
@@ -249,6 +268,10 @@ def handle_menu_contractor(update, context):
 
 
 def wait_message_to_client_contractor(update, context):
+    return start_contractor(update, context)
+
+
+def wait_estimate_contractor(update, context):
     return start_contractor(update, context)
 
 
