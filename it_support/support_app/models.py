@@ -209,7 +209,7 @@ class OrderQuerySet(models.QuerySet):
         for tariff in tariffs:
             tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
             for tariff_order in tariff_orders:
-                not_in_work_time = tariff_order.created_at - timezone.now()
+                not_in_work_time = timezone.now() - tariff_order.created_at
                 limit = 0.95
                 tariff_limit_seconds = tariff.reaction_time_minutes * 60
                 if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
@@ -224,7 +224,7 @@ class OrderQuerySet(models.QuerySet):
         warning_orders = []
 
         for order in orders_not_closed:
-            not_closed_time = order.assigned_at - timezone.now()
+            not_closed_time = timezone.now() - order.assigned_at
             limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
             limit = 0.95
             if not_closed_time.total_seconds() / limit_seconds > limit:
