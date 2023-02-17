@@ -4,6 +4,10 @@ from django.core.management import BaseCommand
 from tgbot_app.tg_bot import TgBot
 
 from tgbot_app.tg_bot import start_client
+from tgbot_app.tg_bot import handle_menu_client
+from tgbot_app.tg_bot import wait_message_to_contractor_client
+from tgbot_app.tg_bot import waiting_order_task
+from tgbot_app.tg_bot import waiting_credentials
 
 from tgbot_app.tg_bot import start_manager
 from tgbot_app.tg_bot import handle_menu_manager
@@ -14,8 +18,6 @@ from tgbot_app.tg_bot import wait_message_to_client_contractor
 from tgbot_app.tg_bot import wait_estimate_contractor
 
 from tgbot_app.tg_bot import start_owner
-from tgbot_app.tg_bot import help_to_order_client
-from tgbot_app.tg_bot import handle_order_client
 from tgbot_app.tg_bot import handle_menu_owner
 
 from tgbot_app.tg_bot import start_not_found
@@ -35,8 +37,10 @@ def start_bot():
         {
             'Клиент': {
                 'START': start_client,
-                'HELP_TO_ORDER': help_to_order_client,
-                'HANDLE_ORDER': handle_order_client,
+                'HANDLE_MENU_CLIENT': handle_menu_client,
+                'WAIT_MESSAGE_TO_CONTRACTOR_CLIENT': wait_message_to_contractor_client,
+                'WAITING_ORDER_TASK': waiting_order_task,
+                'WAITING_CREDENTIALS': waiting_credentials,
             },
             'Менеджер': {
                 'START': start_manager,

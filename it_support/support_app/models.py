@@ -95,12 +95,7 @@ class Tariff(models.Model):
 
 
 class ClientQuerySet(BotUserQuerySet):
-    def calculate_orders(self, year=None, month=None):
-        # TODO: посчитать по каждому заказчику число заказов за месяц
-        pass
-
-    def get_contractors(self):
-        return self.prefetch_related('orders').orders.values('contractor').distinct()
+    pass
 
 
 class Client(BotUser):
@@ -120,6 +115,18 @@ class Client(BotUser):
 
     def has_active_order(self):
         return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).count() > 0
+
+    def get_active_order(self):
+        return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).first()
+
+    def has_in_work_order(self):
+        return self.orders.filter(status=Order.Status.in_work).count() > 0
+
+    def get_in_work_order(self):
+        return self.orders.filter(status=Order.Status.in_work).first()
+
+    def get_contractors(self):
+        return self.prefetch_related('orders').orders.values('contractor__tg_nick').distinct()
 
     objects = ClientQuerySet.as_manager()
 
@@ -214,7 +221,7 @@ class OrderQuerySet(models.QuerySet):
             status=Order.Status.created,
             not_in_work_manager_informed=False,
         )
-        warning_orders = []
+        warning_orders_ids = []
         tariffs = Tariff.objects.all()
 
         # TODO: написать через аннотейты
@@ -225,23 +232,23 @@ class OrderQuerySet(models.QuerySet):
                 limit = 0.95
                 tariff_limit_seconds = tariff.reaction_time_minutes * 60
                 if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
-                    warning_orders.append(tariff_order)
-        return warning_orders
+                    warning_orders_ids.append(tariff_order.pk)
+        return self.filter(pk__in=warning_orders_ids)
 
     def get_warning_orders_not_closed(self):
         orders_not_closed = self.select_related('client', 'contractor').filter(
             status=Order.Status.in_work,
             late_work_manager_informed=False,
         )
-        warning_orders = []
+        warning_orders_ids = []
 
         for order in orders_not_closed:
             not_closed_time = timezone.now() - order.assigned_at
             limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
             limit = 0.95
             if not_closed_time.total_seconds() / limit_seconds > limit:
-                warning_orders.append(order)
-        return warning_orders
+                warning_orders_ids.append(order.pk)
+        return self.filter(pk__in=warning_orders_ids)
 
     def get_available(self):
         return self.filter(status=Order.Status.created).order_by('created_at')
