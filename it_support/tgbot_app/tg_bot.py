@@ -268,6 +268,20 @@ def handle_menu_contractor(update, context):
 
 
 def wait_message_to_client_contractor(update, context):
+    chat_id = update.effective_chat.id
+    message_to_client = update.message.text
+    contractor = context.user_data['user'].contractor
+
+    if not contractor.has_order_in_work():
+        message = 'Что-то пошло не так, попробуйте снова'
+    else:
+        order = contractor.get_order_in_work()
+        client_chat_id = order.client.telegram_id
+        message_to_client = f'Вам сообщение от подрядчика вашего заказа:\n\n{message_to_client}'
+        context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
+        message = 'Сообщение успешно отправлено, когда заказчик ответит вам придет уведомление'
+    context.bot.send_message(text=message, chat_id=chat_id)
+
     return start_contractor(update, context)
 
 
