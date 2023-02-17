@@ -61,6 +61,8 @@ class BotUser(models.Model):
         default=timezone.now,
     )
 
+    objects = BotUserQuerySet.as_manager()
+
     class Meta:
         verbose_name = 'пользователь бота'
         verbose_name_plural = 'пользователи бота'
@@ -155,6 +157,16 @@ class Contractor(BotUser):
             self.status = BotUser.Status.inactive
             self.save()
 
+    def has_order_in_work(self):
+        return len(self.orders.filter(status=Order.Status.in_work)) > 0
+
+    def get_order_in_work(self):
+        return self.orders.filter(status=Order.Status.in_work).first()
+
+    def get_closed_in_actual_billing_orders(self):
+        nearest_billing_start_date = get_nearest_billing_start_date()
+        return self.orders.filter(closed_at__gte=nearest_billing_start_date)
+
     class Meta:
         verbose_name = 'подрядчик'
         verbose_name_plural = 'подрядчики'
@@ -209,7 +221,7 @@ class OrderQuerySet(models.QuerySet):
         for tariff in tariffs:
             tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
             for tariff_order in tariff_orders:
-                not_in_work_time = tariff_order.created_at - timezone.now()
+                not_in_work_time = timezone.now() - tariff_order.created_at
                 limit = 0.95
                 tariff_limit_seconds = tariff.reaction_time_minutes * 60
                 if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
@@ -224,7 +236,7 @@ class OrderQuerySet(models.QuerySet):
         warning_orders = []
 
         for order in orders_not_closed:
-            not_closed_time = order.assigned_at - timezone.now()
+            not_closed_time = timezone.now() - order.assigned_at
             limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
             limit = 0.95
             if not_closed_time.total_seconds() / limit_seconds > limit:
@@ -232,7 +244,7 @@ class OrderQuerySet(models.QuerySet):
         return warning_orders
 
     def get_available(self):
-        return self.filter(status=Order.Status.created)
+        return self.filter(status=Order.Status.created).order_by('created_at')
 
     def get_in_work_not_informed(self):
         return self.filter(status=Order.Status.in_work, in_work_client_informed=False)
@@ -360,9 +372,10 @@ class Order(models.Model):
 
     objects = OrderQuerySet.as_manager()
 
-    def take_in_work(self, contractor):
+    def take_in_work(self, contractor, estimated_hours):
         with atomic():
             self.contractor = contractor
+            self.estimated_hours = estimated_hours
             self.assigned_at = timezone.now()
             self.status = self.Status.in_work
             self.save()

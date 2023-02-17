@@ -10,6 +10,8 @@ from tgbot_app.tg_bot import handle_menu_manager
 
 from tgbot_app.tg_bot import start_contractor
 from tgbot_app.tg_bot import handle_menu_contractor
+from tgbot_app.tg_bot import wait_message_to_client_contractor
+from tgbot_app.tg_bot import wait_estimate_contractor
 
 from tgbot_app.tg_bot import start_owner
 from tgbot_app.tg_bot import help_to_order_client
@@ -43,6 +45,8 @@ def start_bot():
             'Подрядчик': {
                 'START': start_contractor,
                 'HANDLE_MENU_CONTRACTOR': handle_menu_contractor,
+                'WAIT_MESSAGE_TO_CLIENT_CONTRACTOR': wait_message_to_client_contractor,
+                'WAIT_ESTIMATE_CONTRACTOR': wait_estimate_contractor,
             },
             'Владелец': {
                 'START': start_owner,
