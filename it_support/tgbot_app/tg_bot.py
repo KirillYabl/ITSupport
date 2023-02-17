@@ -108,22 +108,20 @@ class TgBot(object):
         update.message.reply_text("Используйте /start для того, что бы перезапустить бот")
 
     def handle_warning_orders_not_in_work(self, context):
-        """
-        Каждому менеджеру отправить сообщение по каждому не взятому заказу
-        В сообщении указать задачу (поле task у заказа) и контакты заказчика (поле client.tg_nick у заказа) не забыв добавить @
-        """
-        # warning_orders_not_in_work = Order.objects.get_warning_orders_not_in_work()  Этот вариант выдает пустой список. Просил напомнить.
-        warning_orders_not_in_work = Order.objects.all()  # Это временный список
-        message = '\n'.join(
+        """Каждому менеджеру отправить сообщение по каждому не взятому заказу"""
+        warning_orders_not_in_work = Order.objects.get_warning_orders_not_in_work()
+        if not warning_orders_not_in_work:  # если не будет просроченных заказов, то не отправляем
+            return
+        message = 'Есть заказы, которые долго не берут в работу\n\n' + '\n'.join(
             [
-                f'Задача: {order.task}\nКонтакт: @{order.client.tg_nick}\n'
+                f'Задача: {order.task} \nКонтакт клиента: @{order.client.tg_nick}\n\n'
                 for order in warning_orders_not_in_work
             ]
         )
         managers = Manager.objects.active()
         for manager in managers:
             context.bot.send_message(text=message, chat_id=manager.telegram_id)
-        warning_orders_not_in_work.update(not_in_work_manager_informed=True)  # это в конце вызывается
+        warning_orders_not_in_work.update(not_in_work_manager_informed=True)
 
     def handle_warning_orders_not_closed(self, context):
         """
