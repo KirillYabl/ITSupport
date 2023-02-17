@@ -221,7 +221,7 @@ class OrderQuerySet(models.QuerySet):
             status=Order.Status.created,
             not_in_work_manager_informed=False,
         )
-        warning_orders = []
+        warning_orders_ids = []
         tariffs = Tariff.objects.all()
 
         # TODO: написать через аннотейты
@@ -232,23 +232,23 @@ class OrderQuerySet(models.QuerySet):
                 limit = 0.95
                 tariff_limit_seconds = tariff.reaction_time_minutes * 60
                 if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
-                    warning_orders.append(tariff_order)
-        return warning_orders
+                    warning_orders_ids.append(tariff_order.pk)
+        return self.filter(pk__in=warning_orders_ids)
 
     def get_warning_orders_not_closed(self):
         orders_not_closed = self.select_related('client', 'contractor').filter(
             status=Order.Status.in_work,
             late_work_manager_informed=False,
         )
-        warning_orders = []
+        warning_orders_ids = []
 
         for order in orders_not_closed:
             not_closed_time = timezone.now() - order.assigned_at
             limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
             limit = 0.95
             if not_closed_time.total_seconds() / limit_seconds > limit:
-                warning_orders.append(order)
-        return warning_orders
+                warning_orders_ids.append(order.pk)
+        return self.filter(pk__in=warning_orders_ids)
 
     def get_available(self):
         return self.filter(status=Order.Status.created).order_by('created_at')
