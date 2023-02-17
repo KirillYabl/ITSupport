@@ -149,7 +149,7 @@ class TgBot(object):
         message = 'Есть заказы, которые не выполнены\n\n' + '\n'.join(
             [
                 f'Задача: {order.task}\nКонтакт подрядчика: @{order.contractor.tg_nick}\n' +
-                'Контакт клиента: @{order.client.tg_nick}\n\n'
+                f'Контакт клиента: @{order.client.tg_nick}\n\n'
                 for order in warning_orders_not_closed
             ]
         )
