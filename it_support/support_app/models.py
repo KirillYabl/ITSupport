@@ -95,12 +95,7 @@ class Tariff(models.Model):
 
 
 class ClientQuerySet(BotUserQuerySet):
-    def calculate_orders(self, year=None, month=None):
-        # TODO: посчитать по каждому заказчику число заказов за месяц
-        pass
-
-    def get_contractors(self):
-        return self.prefetch_related('orders').orders.values('contractor').distinct()
+    pass
 
 
 class Client(BotUser):
@@ -120,6 +115,18 @@ class Client(BotUser):
 
     def has_active_order(self):
         return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).count() > 0
+
+    def get_active_order(self):
+        return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).first()
+
+    def has_in_work_order(self):
+        return self.orders.filter(status=Order.Status.in_work).count() > 0
+
+    def get_in_work_order(self):
+        return self.orders.filter(status=Order.Status.in_work).first()
+
+    def get_contractors(self):
+        return self.prefetch_related('orders').orders.values('contractor__tg_nick').distinct()
 
     objects = ClientQuerySet.as_manager()
 
