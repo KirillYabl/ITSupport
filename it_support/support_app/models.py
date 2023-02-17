@@ -135,7 +135,7 @@ class Client(BotUser):
 
     def get_contractors(self):
         """Получить список выполнявших работу подрядчиков, которые еще работают"""
-        return self.prefetch_related('orders').orders.filter(
+        return self.orders.select_related('contractor').filter(
             contractor__status=BotUser.Status.active
         ).values('contractor__tg_nick').distinct()
 
