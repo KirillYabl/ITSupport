@@ -149,9 +149,24 @@ class TgBot(object):
         подрядчика (поле contractor.tg_nick у заказа) не забыв добавить @
         """
         warning_orders_not_closed = Order.objects.get_warning_orders_not_closed()
-        # managers = Manager.objects.active()
-
-        # warning_orders_not_closed.update(late_work_manager_informed=True)  # это в конце вызывается
+        if not warning_orders_not_closed:  # если не будет просроченных заказов, то не отправляем
+            return
+        message = 'Есть заказы, которые не выполнены\n\n' + '\n'.join(
+            [
+                (
+                    f'Задача: {order.task}\n'
+                    f'Контакт подрядчика: @{order.contractor.tg_nick}'
+                    f'\nКонтакт клиента: @{order.client.tg_nick}\n\n'
+                 )
+                for order in warning_orders_not_closed
+            ]
+        )
+        managers = Manager.objects.active()
+        for manager in managers:
+            context.bot.send_message(text=message, chat_id=manager.telegram_id)
+        warning_orders_not_closed.update(
+            late_work_manager_informed=True)  # это в конце вызывается
+        warning_orders_not_closed.update(late_work_manager_informed=True)  # это в конце вызывается
 
 
 def start_not_found(update: Update, context: CallbackContext) -> str:
