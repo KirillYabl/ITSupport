@@ -1,6 +1,7 @@
 from textwrap import dedent
 from typing import Callable
 
+
 from telegram import InlineKeyboardButton
 from telegram import InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
@@ -71,6 +72,7 @@ class TgBot(object):
         self.updater.dispatcher.add_handler(MessageHandler(Filters.text, get_user(self.handle_users_reply)))
         self.updater.dispatcher.add_error_handler(self.error)
         self.job_queue = self.updater.job_queue
+        # Что-то с закомментированным кодом ниже не так, присылает левые данные
 
         self.job_queue.run_repeating(
             self.handle_warning_orders_not_in_work,
@@ -161,6 +163,11 @@ class TgBot(object):
 
 def start_not_found(update: Update, context: CallbackContext) -> str:
     """Ответ для неизвестного, что мы его не знаем ему нужно связаться с админами"""
+    chat_id = update.effective_chat.id
+    context.bot.send_message(
+            chat_id=chat_id,
+            text='Вы не являетесь нашим клиентом, пожалуйста обратитесь к менеджеру',
+        )
     return 'START'
 
 
@@ -193,7 +200,54 @@ def handle_menu_manager(update: Update, context: CallbackContext) -> str:
 # Функции для клиента
 def start_client(update: Update, context: CallbackContext) -> str:
     """Ответ для клиента"""
-    return ''  # TODO: придумать название
+    chat_id = update.effective_chat.id
+    client = context.user_data['user'].client
+    text = 'Здравствуйте, что вы хотите?'
+    reply_markup = ReplyKeyboardMarkup(
+        [
+            ['Хочу получить помощь'],
+        ],
+        one_time_keyboard=False, row_width=1, resize_keyboard=True
+    )
+    context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+    return 'HELP_TO_ORDER'
+
+
+def help_to_order_client(update, context):
+    chat_id = update.effective_chat.id
+    client = context.user_data['user'].client
+
+    if not client.has_limit_of_orders():
+        text = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
+        context.bot.send_message(chat_id=chat_id, text=text)
+        return 'START'
+    elif client.has_active_order():
+        text = 'Ваша заявка ещё в обработке, пожалуйста ожидайте'
+        context.bot.send_message(chat_id=chat_id, text=text)
+        return 'START'
+    else:
+        with open('order_examples.txt', 'r') as file:
+            text = 'Вы можете оставить заявку в чате.\nПримеры заявок:\n'
+            order_examples = file.readlines()
+            for order_example in order_examples:
+                text += f'* {order_example}'
+            context.bot.send_message(chat_id=chat_id, text=text, reply_markup=ReplyKeyboardRemove())
+        return 'HANDLE_ORDER'
+
+
+def handle_order_client(update, context):
+    chat_id = update.effective_chat.id
+    order_text = update.message.text
+    client = context.user_data['user'].client
+    reaction_time_hours = int(client.tariff.reaction_time_minutes / 60)
+    order = Order.objects.create(client=client, task=order_text)
+    text = '''\
+    Количество часов, через которое возьмут вашу заявку: {}.\
+    Пришлите логин и пароль одним сообщением.\nПример:\
+    \n\nЛогин: Иван\nПароль: qwerty
+    '''.format(reaction_time_hours)
+    context.bot.send_message(chat_id=chat_id, text=text)
+
 
 
 # Функции для подрядчика

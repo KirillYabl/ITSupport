@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import Min, Max, Count
 from django.db.transaction import atomic
 from django.utils import timezone
+from datetime import datetime
 from dateutil import relativedelta
 
 
@@ -199,6 +200,15 @@ class Owner(BotUser):
 
 
 class OrderQuerySet(models.QuerySet):
+    def get_quantity_orders(self, client):
+        current_datetime = datetime.now()
+        orders_in_month = self.filter(
+            status='закрыт',
+            client=client,
+            created_at__month=current_datetime.month,
+        )
+        return len(orders_in_month)
+
     def get_warning_orders_not_in_work(self):
         orders_not_in_work = self.select_related('client').filter(
             status=Order.Status.created,
