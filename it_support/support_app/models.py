@@ -7,7 +7,8 @@ from datetime import datetime
 from dateutil import relativedelta
 
 
-def get_nearest_billing_start_date():
+def get_nearest_billing_start_date() -> timezone.datetime:
+    """Получить дату начала текущего биллинга"""
     try:
         billing_day = int(SystemSettings.objects.get('BILLING_DAY').parameter_value)
     except (SystemSettings.DoesNotExist, ValueError):
@@ -27,6 +28,7 @@ def get_nearest_billing_start_date():
 
 class BotUserQuerySet(models.QuerySet):
     def active(self):
+        """Активные пользователи бота"""
         return self.filter(status=BotUser.Status.active)
 
 
@@ -103,9 +105,11 @@ class Client(BotUser):
     paid = models.BooleanField('оплачен ли тариф', db_index=True)
 
     def can_create_orders(self):
+        """Может ли делать новые заказы (оплачен тариф)"""
         return self.paid
 
     def has_limit_of_orders(self):
+        """Имеет ли лимит для заказов в этом месяце"""
         nearest_billing_start_date = get_nearest_billing_start_date()
 
         created_orders_count = self.orders.filter(created_at__gte=nearest_billing_start_date).count()
@@ -114,19 +118,26 @@ class Client(BotUser):
         return can_create_orders_count > created_orders_count
 
     def has_active_order(self):
+        """Есть ли активный заказ"""
         return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).count() > 0
 
     def get_active_order(self):
+        """Получить активный заказ"""
         return self.orders.filter(status__in=[Order.Status.created, Order.Status.in_work]).first()
 
     def has_in_work_order(self):
+        """Есть ли заказ в работе (т.е. взятый подрядчиком)"""
         return self.orders.filter(status=Order.Status.in_work).count() > 0
 
     def get_in_work_order(self):
+        """Получить заказ в работе (т.е. взятый подрядчиком)"""
         return self.orders.filter(status=Order.Status.in_work).first()
 
     def get_contractors(self):
-        return self.prefetch_related('orders').orders.values('contractor__tg_nick').distinct()
+        """Получить список выполнявших работу подрядчиков, которые еще работают"""
+        return self.prefetch_related('orders').orders.filter(
+            contractor__status=BotUser.Status.active
+        ).values('contractor__tg_nick').distinct()
 
     objects = ClientQuerySet.as_manager()
 
@@ -140,6 +151,7 @@ class Client(BotUser):
 
 class ContractorQuerySet(BotUserQuerySet):
     def get_available(self):
+        """Получить свободных подрядчиков"""
         not_available_contractors = Order.objects.select_related('contractor').filter(
             status=Order.Status.in_work).values('contractor').distinct()
         not_available_contractor_ids = [contractor['contractor'] for contractor in not_available_contractors]
@@ -150,6 +162,7 @@ class Contractor(BotUser):
     objects = ContractorQuerySet.as_manager()
 
     def delete_from_bot(self):
+        """Удалить подрядчика из бота, освободив его заказы"""
         contractor_orders = Order.objects.filter(status=Order.Status.in_work, contractor=self)
         with atomic():
             contractor_orders.update(
@@ -165,12 +178,15 @@ class Contractor(BotUser):
             self.save()
 
     def has_order_in_work(self):
+        """Есть ли заказ в работе"""
         return len(self.orders.filter(status=Order.Status.in_work)) > 0
 
     def get_order_in_work(self):
+        """Получить заказ в работе"""
         return self.orders.filter(status=Order.Status.in_work).first()
 
     def get_closed_in_actual_billing_orders(self):
+        """Получить закрытые в текущем биллинге заказы"""
         nearest_billing_start_date = get_nearest_billing_start_date()
         return self.orders.filter(closed_at__gte=nearest_billing_start_date)
 
@@ -197,7 +213,13 @@ class Manager(BotUser):
         return f'{self.tg_nick} ({self.status})'
 
 
+class OwnerQuerySet(BotUserQuerySet):
+    pass
+
+
 class Owner(BotUser):
+    objects = OwnerQuerySet.as_manager()
+
     class Meta:
         verbose_name = 'владелец'
         verbose_name_plural = 'владельцы'
@@ -207,16 +229,8 @@ class Owner(BotUser):
 
 
 class OrderQuerySet(models.QuerySet):
-    def get_quantity_orders(self, client):
-        current_datetime = datetime.now()
-        orders_in_month = self.filter(
-            status='закрыт',
-            client=client,
-            created_at__month=current_datetime.month,
-        )
-        return len(orders_in_month)
-
     def get_warning_orders_not_in_work(self):
+        """Получить список новых заказов, которые почти просрочили (долго не берут в работу)"""
         orders_not_in_work = self.select_related('client').filter(
             status=Order.Status.created,
             not_in_work_manager_informed=False,
@@ -236,6 +250,7 @@ class OrderQuerySet(models.QuerySet):
         return self.filter(pk__in=warning_orders_ids)
 
     def get_warning_orders_not_closed(self):
+        """Получить список выполняющихся заказов, которые почти просрочили (долго выполняют)"""
         orders_not_closed = self.select_related('client', 'contractor').filter(
             status=Order.Status.in_work,
             late_work_manager_informed=False,
@@ -251,15 +266,11 @@ class OrderQuerySet(models.QuerySet):
         return self.filter(pk__in=warning_orders_ids)
 
     def get_available(self):
+        """Получить список заказов, которые можно взять в работу"""
         return self.filter(status=Order.Status.created).order_by('created_at')
 
-    def get_in_work_not_informed(self):
-        return self.filter(status=Order.Status.in_work, in_work_client_informed=False)
-
-    def get_closed_not_informed(self):
-        return self.filter(status=Order.Status.closed, closed_client_informed=False)
-
     def calculate_average_orders_in_month(self):
+        """Получить помесячную (финансовый месяц) статистику по заказам"""
         nearest_billing_start_date = get_nearest_billing_start_date()
         prev_billing_start_date = nearest_billing_start_date - relativedelta.relativedelta(months=1)
 
@@ -300,6 +311,7 @@ class OrderQuerySet(models.QuerySet):
         return stats
 
     def calculate_billing(self):
+        """Посчитать биллинг для подрядчиков за прошелший финансовый месяц"""
         nearest_billing_start_date = get_nearest_billing_start_date()
         prev_billing_start_date = nearest_billing_start_date - relativedelta.relativedelta(months=1)
 
@@ -380,6 +392,7 @@ class Order(models.Model):
     objects = OrderQuerySet.as_manager()
 
     def take_in_work(self, contractor, estimated_hours):
+        """Взять заказ в работу"""
         with atomic():
             self.contractor = contractor
             self.estimated_hours = estimated_hours
@@ -388,6 +401,7 @@ class Order(models.Model):
             self.save()
 
     def close_work(self):
+        """Завершить заказ"""
         with atomic():
             self.closed_at = timezone.now()
             self.status = self.Status.closed
@@ -395,6 +409,7 @@ class Order(models.Model):
             self.save()
 
     def cancel_work(self):
+        """Отменить заказ"""
         with atomic():
             self.closed_at = timezone.now()
             self.status = self.Status.cancelled
@@ -402,10 +417,12 @@ class Order(models.Model):
             self.save()
 
     def encode_creds(self, creds):
+        """Раскодировать доступы"""
         # TODO: написать шифрование доступов
         return creds
 
     def decode_creds(self, creds):
+        """Закодировать доступы"""
         # TODO: написать шифрование доступов
         return creds
 
