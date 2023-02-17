@@ -60,6 +60,8 @@ class BotUser(models.Model):
         default=timezone.now,
     )
 
+    objects = BotUserQuerySet.as_manager()
+
     class Meta:
         verbose_name = 'пользователь бота'
         verbose_name_plural = 'пользователи бота'
