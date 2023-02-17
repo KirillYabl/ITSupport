@@ -360,9 +360,10 @@ class Order(models.Model):
 
     objects = OrderQuerySet.as_manager()
 
-    def take_in_work(self, contractor):
+    def take_in_work(self, contractor, estimated_hours):
         with atomic():
             self.contractor = contractor
+            self.estimated_hours = estimated_hours
             self.assigned_at = timezone.now()
             self.status = self.Status.in_work
             self.save()

@@ -257,7 +257,9 @@ def handle_menu_contractor(update, context):
             bad_scenario = True
 
         if not bad_scenario:
-            message = 'Пришлите приблизительную оценку требуемого на выполнения времени в часах'
+            message = dedent('''Пришлите приблизительную оценку требуемого на выполнения времени в часах
+                                Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени
+                                обратитесь к менеджерам, мы не оказываем проектную поддержку''')
             context.user_data['order_in_process'] = order
             context.bot.send_message(text=message, chat_id=chat_id)
             return 'WAIT_ESTIMATE_CONTRACTOR'
@@ -269,10 +271,13 @@ def handle_menu_contractor(update, context):
 
 def wait_message_to_client_contractor(update, context):
     chat_id = update.effective_chat.id
-    message_to_client = update.message.text
+    no_text_message = True
+    if update.message:
+        message_to_client = update.message.text
+        no_text_message = False
     contractor = context.user_data['user'].contractor
 
-    if not contractor.has_order_in_work():
+    if not contractor.has_order_in_work() or no_text_message:
         message = 'Что-то пошло не так, попробуйте снова'
     else:
         order = contractor.get_order_in_work()
@@ -286,6 +291,36 @@ def wait_message_to_client_contractor(update, context):
 
 
 def wait_estimate_contractor(update, context):
+    chat_id = update.effective_chat.id
+    no_text_message = True
+    if update.message:
+        estimated_time_hours = update.message.text
+        no_text_message = False
+    order_in_process = context.user_data['order_in_process']
+    contractor = context.user_data['user'].contractor
+
+    if order_in_process and order_in_process.status != Order.Status.created:
+        message = 'К сожалению заказ уже взяли, попробуйте снова получить список заказов'
+    elif no_text_message or not order_in_process:
+        message = 'Что-то пошло не так, попробуйте снова'
+        context.bot.send_message(text=message, chat_id=chat_id)
+        return 'WAIT_ESTIMATE_CONTRACTOR'
+    else:
+        try:
+            estimated_time_hours = int(estimated_time_hours)
+            if 1 <= estimated_time_hours <= 24:
+                order_in_process.take_in_work(contractor, estimated_time_hours)
+                message = 'Заказ успешно взят в работу, приятной работы'
+            else:
+                message = 'Оценка должна быть от 1 до 24 часов, попробуйте снова или обратитесь к менеджеру'
+                context.bot.send_message(text=message, chat_id=chat_id)
+                return 'WAIT_ESTIMATE_CONTRACTOR'
+        except ValueError:
+            message = 'Не удалось преобразовать вашу оценку в целое число, попробуйте снова'
+            context.bot.send_message(text=message, chat_id=chat_id)
+            return 'WAIT_ESTIMATE_CONTRACTOR'
+
+    context.bot.send_message(text=message, chat_id=chat_id)
     return start_contractor(update, context)
 
 
