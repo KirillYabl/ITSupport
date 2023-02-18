@@ -54,6 +54,8 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         available_orders = Order.objects.get_available()
         if not available_orders:
             message = 'Нет заказов, которые можно взять в работу'
+            context.bot.send_message(text=message, chat_id=chat_id)
+            return start_contractor(update, context)
         for order in available_orders:
             # send every order in different message because it contains button to take order
             message = dedent(f'''Задание:
@@ -83,8 +85,8 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
     elif query and query.data == 'close_order':  # contractor request to close active order
         message = 'У вас нет активного заказа'
         if contractor.has_order_in_work():
-            order_in_work = contractor.get_order_in_work().select_related('client')
-            client_chat_id = order_in_work.client.tg_nick
+            order_in_work = contractor.get_order_in_work()
+            client_chat_id = order_in_work.client.telegram_id
             order_in_work.close_work()
             message_to_client = dedent('''Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
                                           Если вам нужна будет помощь, мы рядом!''')
@@ -179,7 +181,7 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
         try:
             estimated_time_hours = int(estimated_time_hours)
             if 1 <= estimated_time_hours <= 24:  # limit from DB
-                client_chat_id = order_in_process.client.tg_nick
+                client_chat_id = order_in_process.client.telegram_id
                 order_in_process.take_in_work(contractor, estimated_time_hours)
                 context.user_data['order_in_process'] = None
                 message_to_client = dedent('Ваш заказ взят работу! При выполнении пришлем уведомление.')
