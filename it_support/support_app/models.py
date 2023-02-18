@@ -146,6 +146,11 @@ class Client(BotUser):
         """Это закрепленный подрядчик?"""
         return self.contractors.filter(pk=contractor.pk).exists()
 
+    def get_not_assigned_contractors(self):
+        """Получить всех не закрепленных свободных подрядчиков"""
+        assigned_contractors_ids = [contractor.pk for contractor in self.contractors]
+        return Contractor.objects.get_available().exclude(pk__in=assigned_contractors_ids)
+
     objects = ClientQuerySet.as_manager()
 
     class Meta:
@@ -280,6 +285,10 @@ class OrderQuerySet(models.QuerySet):
     def get_available(self):
         """Получить список заказов, которые можно взять в работу"""
         return self.filter(status=Order.Status.created).order_by('created_at')
+
+    def get_available_not_informed_all(self):
+        """Получить список заказов, которые можно взять в работу и по которым не проинформированы все подрядчики"""
+        return self.get_available().filter(assigned_contractors_all=False)
 
     def calculate_average_orders_in_month(self):
         """Получить помесячную (финансовый месяц) статистику по заказам"""

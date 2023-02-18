@@ -1,5 +1,8 @@
+from textwrap import dedent
 from typing import Callable
 
+from django.db.transaction import atomic
+from django.utils import timezone
 from telegram.ext import CallbackQueryHandler
 from telegram.ext import CommandHandler
 from telegram.ext import Filters
@@ -10,6 +13,7 @@ from telegram.update import Update
 
 from support_app.models import BotUser
 from support_app.models import Manager
+from support_app.models import Contractor
 from support_app.models import Order
 
 
@@ -78,6 +82,13 @@ class TgBot(object):
             self.handle_warning_orders_not_closed,
             interval=60,
             first=20,
+            name='handle_warning_orders_not_closed'
+        )
+
+        self.job_queue.run_repeating(
+            self.handle_new_orders_inform,
+            interval=60,
+            first=30,
             name='handle_warning_orders_not_closed'
         )
 
@@ -152,3 +163,59 @@ class TgBot(object):
         for manager in managers:
             context.bot.send_message(text=message, chat_id=manager.telegram_id)
         warning_orders_not_closed.update(late_work_manager_informed=True)
+
+    def handle_new_orders_inform(self, context: CallbackContext) -> None:
+        """If there are a new orders contractors should be informed"""
+        new_orders = Order.objects.get_available_not_informed_all().select_related(
+            'client',
+            'client__tariff',
+        )
+        available_contractors = Contractor.objects.get_available()
+
+        # it can be not optimal if many new orders but it should be about 5 orders in hour
+        # so it not a big chance to have more then 2 orders simultaneously
+        # also it send message to many contractors but telegram don't have bulk message :(
+        for new_order in new_orders:
+            # only send message without button
+            # because contractor can do anything and button can broke his process
+            message = dedent(f'''Появился новый заказ, для взятие в работу нажмите "Посмотреть заказы"\
+                                 и выберите данный заказ:
+
+                                 Задание:
+                                 {new_order.task}''')
+            client = new_order.client
+            if not client.contractors:
+                # if no assigned contractors then send all available and mark then
+                # send both - assigned and all
+                for contractor in available_contractors:
+                    contractor_chat_id = contractor.telegram_id
+                    context.bot.send_message(text=message, chat_id=contractor_chat_id)
+                with atomic():
+                    new_order.assigned_contractors_informed = True
+                    new_order.all_contractors_informed = True
+                    new_order.save()
+            else:
+                # check if time for assigned contractors or all
+                client_tariff_reaction_time_seconds = new_order.client.tariff.reaction_time_minutes * 60
+                seconds_from_created = (timezone.now() - new_order.created_at).total_seconds()
+                assigned_contractors_limit = 0.2  # TODO system parameter
+                is_inform_only_assigned_contractors = False
+                if seconds_from_created / client_tariff_reaction_time_seconds < assigned_contractors_limit:
+                    is_inform_only_assigned_contractors = True
+
+                # check that assigned contractors weren't informed too
+                if is_inform_only_assigned_contractors and not new_order.assigned_contractors_informed:
+                    for contractor in client.contractors:
+                        contractor_chat_id = contractor.telegram_id
+                        context.bot.send_message(text=message, chat_id=contractor_chat_id)
+                        new_order.assigned_contractors_informed = True
+                        new_order.save()
+                elif not is_inform_only_assigned_contractors:
+                    # inform all contractors except assigned
+                    for contractor in client.get_not_assigned_contractors():
+                        contractor_chat_id = contractor.telegram_id
+                        context.bot.send_message(text=message, chat_id=contractor_chat_id)
+                        with atomic():
+                            new_order.assigned_contractors_informed = True  # just for be sure
+                            new_order.all_contractors_informed = True
+                            new_order.save()
