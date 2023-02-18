@@ -73,7 +73,12 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
     elif query and query.data == 'close_order':  # contractor request to close active order
         message = 'У вас нет активного заказа'
         if contractor.has_order_in_work():
-            contractor.get_order_in_work().close_work()
+            order_in_work = contractor.get_order_in_work().select_related('client')
+            client_chat_id = order_in_work.client.tg_nick
+            order_in_work.close_work()
+            message_to_client = dedent('''Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
+                                          Если вам нужна будет помощь, мы рядом!''')
+            context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
             message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
     elif query and query.data == 'my_salary':  # contractor request to get his salary in this month
         closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
@@ -155,7 +160,11 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
         try:
             estimated_time_hours = int(estimated_time_hours)
             if 1 <= estimated_time_hours <= 24:  # limit from DB
+                client_chat_id = order_in_process.client.tg_nick
                 order_in_process.take_in_work(contractor, estimated_time_hours)
+                context.user_data['order_in_process'] = None
+                message_to_client = dedent('Ваш заказ взят работу! При выполнении пришлем уведомление.')
+                context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
                 message = 'Заказ успешно взят в работу, приятной работы'
             else:
                 message = 'Оценка должна быть от 1 до 24 часов, попробуйте снова или обратитесь к менеджеру'
