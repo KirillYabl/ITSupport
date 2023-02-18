@@ -1,9 +1,8 @@
 from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator, MaxValueValidator
 from django.db import models
-from django.db.models import Min, Max, Count
+from django.db.models import Min, Count
 from django.db.transaction import atomic
 from django.utils import timezone
-from datetime import datetime
 from dateutil import relativedelta
 
 
@@ -187,7 +186,7 @@ class Contractor(BotUser):
 
     def has_order_in_work(self):
         """Есть ли заказ в работе"""
-        return len(self.orders.filter(status=Order.Status.in_work)) > 0
+        return self.orders.filter(status=Order.Status.in_work).exists()
 
     def get_order_in_work(self):
         """Получить заказ в работе"""
@@ -383,14 +382,6 @@ class Order(models.Model):
     )
     late_work_manager_informed = models.BooleanField(
         'менеджер проинформирован что заказ долго выполняется',
-        default=False,
-    )
-    in_work_client_informed = models.BooleanField(
-        'клиент проинформирован что заказ взят',
-        default=False,
-    )
-    closed_client_informed = models.BooleanField(
-        'клиент проинформирован что заказ выполнен',
         default=False,
     )
 
