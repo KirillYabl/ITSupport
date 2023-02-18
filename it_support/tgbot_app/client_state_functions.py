@@ -38,11 +38,11 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
     query = update.callback_query
     client = context.user_data['user'].client
     keyboard = [
-        [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
+        [InlineKeyboardButton('Вернуться назад', callback_data='get_back_to_order_creation')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
-    if query and query.data in ['create_order', 'get_back']:  # client request order creation
+    if query and query.data in ['create_order', 'get_back_to_order_creation']:  # client request order creation
         if not client.has_limit_of_orders():
             message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
         elif client.has_active_order():
@@ -60,6 +60,7 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
                 order_examples = file.readlines()
                 for order_example in order_examples:
                     message += order_example
+                context.bot.registe
                 context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
             return 'WAITING_ORDER_TASK'
     elif query and query.data == 'send_message_to_contractor':  # client request send message to contractor

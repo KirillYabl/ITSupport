@@ -64,11 +64,12 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             ''')
             keyboard = [
                 [InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')],
-                [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
             ]
+            if order == list(available_orders)[-1]:
+                keyboard.append([InlineKeyboardButton('Вернуться назад', callback_data='get_back')])
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
-            return 'HANDLE_MENU_CONTRACTOR'
+        return 'HANDLE_MENU_CONTRACTOR'
     elif query and query.data == 'send_message_to_client':  # contractor request to send message to client
         message = 'У вас нет активного заказа'
         if contractor.has_order_in_work():
