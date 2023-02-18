@@ -30,7 +30,9 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
     contractor = context.user_data['user'].contractor
 
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
-    if query and query.data == 'how_contractor_bot_work':  # contractor request a help
+    if query and query.data in ['get_back', 'return_to_start']:
+        return start_contractor(update, context)
+    elif query and query.data == 'how_contractor_bot_work':  # contractor request a help
         message = dedent('''
         При появлении новых заказов вам будет приходить уведомление,
         где вы можете взять заказ в работу
@@ -60,15 +62,23 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             Доступы к сайту:
             {order.creds}
             ''')
-            keyboard = [[InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')]]
+            keyboard = [
+                [InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')],
+            ]
+            if order == list(available_orders)[-1]:
+                keyboard.append([InlineKeyboardButton('Вернуться назад', callback_data='get_back')])
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
-            return 'HANDLE_MENU_CONTRACTOR'
+        return 'HANDLE_MENU_CONTRACTOR'
     elif query and query.data == 'send_message_to_client':  # contractor request to send message to client
         message = 'У вас нет активного заказа'
         if contractor.has_order_in_work():
             message = 'Напишите сообщение клиенту'
-            context.bot.send_message(text=message, chat_id=chat_id)
+            keyboard = [
+                [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
             return 'WAIT_MESSAGE_TO_CLIENT_CONTRACTOR'
     elif query and query.data == 'close_order':  # contractor request to close active order
         message = 'У вас нет активного заказа'
@@ -103,11 +113,15 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             bad_scenario = True
 
         if not bad_scenario:
-            message = dedent('''Пришлите приблизительную оценку требуемого на выполнения времени в часах
-                                Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени
+            message = dedent('''Пришлите приблизительную оценку требуемого на выполнения времени в часах \
+                                Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени \
                                 обратитесь к менеджерам, мы не оказываем проектную поддержку''')
             context.user_data['order_in_process'] = order
-            context.bot.send_message(text=message, chat_id=chat_id)
+            keyboard = [
+                [InlineKeyboardButton('Вернуться в начало', callback_data='return_to_start')],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
             return 'WAIT_ESTIMATE_CONTRACTOR'
 
     context.bot.send_message(text=message, chat_id=chat_id)
@@ -118,13 +132,16 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
 def wait_message_to_client_contractor(update: Update, context: CallbackContext) -> str:
     """Handler of waiting contractor message to client"""
     chat_id = update.effective_chat.id
+    query = update.callback_query
     no_text_message = True
     if update.message:
         message_to_client = update.message.text
         no_text_message = False
     contractor = context.user_data['user'].contractor
 
-    if not contractor.has_order_in_work() or no_text_message:  # if order disappeared or contractor send not a text
+    if query and query.data in ['get_back', 'return_to_start']:
+        return start_contractor(update, context)
+    elif not contractor.has_order_in_work() or no_text_message:  # if order disappeared or contractor send not a text
         message = 'Что-то пошло не так, попробуйте снова'
     else:
         order = contractor.get_order_in_work()
@@ -143,14 +160,16 @@ def wait_message_to_client_contractor(update: Update, context: CallbackContext) 
 def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
     """Handler of waiting estimate from contractor while he is giving an order"""
     chat_id = update.effective_chat.id
+    query = update.callback_query
     no_text_message = True
     if update.message:
         estimated_time_hours = update.message.text
         no_text_message = False
     order_in_process = context.user_data['order_in_process']
     contractor = context.user_data['user'].contractor
-
-    if order_in_process and order_in_process.status != Order.Status.created:  # check if order available and in context
+    if query and query.data == 'return_to_start':
+        return start_contractor(update, context)
+    elif order_in_process and order_in_process.status != Order.Status.created:  # check if order available and in context
         message = 'К сожалению заказ уже взяли, попробуйте снова получить список заказов'
     elif no_text_message or not order_in_process:  # check if contractor send text message
         message = 'Что-то пошло не так, попробуйте снова'
@@ -168,7 +187,11 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
                 message = 'Заказ успешно взят в работу, приятной работы'
             else:
                 message = 'Оценка должна быть от 1 до 24 часов, попробуйте снова или обратитесь к менеджеру'
-                context.bot.send_message(text=message, chat_id=chat_id)
+                keyboard = [
+                    [InlineKeyboardButton('Вернуться в начало', callback_data='return_to_start')],
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
                 return 'WAIT_ESTIMATE_CONTRACTOR'
         except ValueError:
             # estimate not a number
