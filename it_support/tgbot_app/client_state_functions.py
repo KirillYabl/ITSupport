@@ -60,7 +60,6 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
                 order_examples = file.readlines()
                 for order_example in order_examples:
                     message += order_example
-                context.bot.registe
                 context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
             return 'WAITING_ORDER_TASK'
     elif query and query.data == 'send_message_to_contractor':  # client request send message to contractor
