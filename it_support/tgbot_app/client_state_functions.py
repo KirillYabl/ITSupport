@@ -38,11 +38,11 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
     query = update.callback_query
     client = context.user_data['user'].client
     keyboard = [
-        [InlineKeyboardButton('Вернуться назад', callback_data='get_back_to_order_creation')],
+        [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
-    if query and query.data in ['create_order', 'get_back_to_order_creation']:  # client request order creation
+    if query and query.data in ['create_order', 'get_back', 'get_back_to_order_creation']:  # client request order creation
         if not client.has_limit_of_orders():
             message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
         elif client.has_active_order():
@@ -123,7 +123,7 @@ def waiting_order_task(update: Update, context: CallbackContext) -> str:
         context.user_data['creating_order_task'] = order_task
         message = 'Пришлите логин и пароль одним сообщением.\nПример:\nЛогин: Иван\nПароль: qwerty'
         keyboard = [
-                    [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
+                    [InlineKeyboardButton('Вернуться назад', callback_data='get_back_to_order_creation')],
                 ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
@@ -139,7 +139,7 @@ def waiting_credentials(update: Update, context: CallbackContext) -> str:
         no_text_message = False
     client = context.user_data['user'].client
 
-    if query and query.data == 'get_back':
+    if query and query.data == 'get_back_to_order_creation':
         return handle_menu_client(update, context)
     elif no_text_message:
         message = 'Что-то пошло не так, попробуйте снова'
