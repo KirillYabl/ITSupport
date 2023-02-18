@@ -288,7 +288,7 @@ class OrderQuerySet(models.QuerySet):
 
     def get_available_not_informed_all(self):
         """Получить список заказов, которые можно взять в работу и по которым не проинформированы все подрядчики"""
-        return self.get_available().filter(assigned_contractors_all=False)
+        return self.get_available().filter(all_contractors_informed=False)
 
     def calculate_average_orders_in_month(self):
         """Получить помесячную (финансовый месяц) статистику по заказам"""
