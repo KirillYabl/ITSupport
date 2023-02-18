@@ -139,6 +139,14 @@ class Client(BotUser):
             contractor__status=BotUser.Status.active
         ).values('contractor__tg_nick').distinct()
 
+    def assign_contractor(self, contractor):
+        """Закрепить подрядчика"""
+        AssignedContractor.objects.get_or_create(client=self, contractor=contractor)
+
+    def is_assigned_contractor(self, contractor):
+        """Это закрепленный подрядчик?"""
+        return self.contractors.filter(pk=contractor.pk).exists()
+
     objects = ClientQuerySet.as_manager()
 
     class Meta:
@@ -226,6 +234,11 @@ class Owner(BotUser):
 
     def __str__(self):
         return f'{self.tg_nick} ({self.status})'
+
+
+class AssignedContractor(models.Model):
+    client = models.ForeignKey(Client, related_name='contractors', on_delete=models.DO_NOTHING)
+    contractor = models.ForeignKey(Contractor, related_name='clients', on_delete=models.DO_NOTHING)
 
 
 class OrderQuerySet(models.QuerySet):
@@ -387,6 +400,15 @@ class Order(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(24)],
         null=True,
         blank=True,
+    )
+
+    assigned_contractors_informed = models.BooleanField(
+        'закрепленные подрядчики проинформированы',
+        default=False,
+    )
+    all_contractors_informed = models.BooleanField(
+        'все подрядчики проинформированы',
+        default=False,
     )
 
     objects = OrderQuerySet.as_manager()
