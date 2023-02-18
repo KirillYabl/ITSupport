@@ -148,7 +148,7 @@ class Client(BotUser):
 
     def get_not_assigned_contractors(self):
         """Получить всех не закрепленных свободных подрядчиков"""
-        assigned_contractors_ids = [contractor.pk for contractor in self.contractors]
+        assigned_contractors_ids = [contractor.pk for contractor in self.contractors.all()]
         return Contractor.objects.get_available().exclude(pk__in=assigned_contractors_ids)
 
     objects = ClientQuerySet.as_manager()
