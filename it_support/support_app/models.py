@@ -1,9 +1,8 @@
 from django.core.validators import MinLengthValidator, RegexValidator, MinValueValidator, MaxValueValidator
 from django.db import models
-from django.db.models import Min, Max, Count
+from django.db.models import Min, Count
 from django.db.transaction import atomic
 from django.utils import timezone
-from datetime import datetime
 from dateutil import relativedelta
 
 
@@ -139,6 +138,19 @@ class Client(BotUser):
             contractor__status=BotUser.Status.active
         ).values('contractor__tg_nick').distinct()
 
+    def assign_contractor(self, contractor):
+        """Закрепить подрядчика"""
+        AssignedContractor.objects.get_or_create(client=self, contractor=contractor)
+
+    def is_assigned_contractor(self, contractor):
+        """Это закрепленный подрядчик?"""
+        return self.contractors.filter(pk=contractor.pk).exists()
+
+    def get_not_assigned_contractors(self):
+        """Получить всех не закрепленных свободных подрядчиков"""
+        assigned_contractors_ids = [contractor.pk for contractor in self.contractors]
+        return Contractor.objects.get_available().exclude(pk__in=assigned_contractors_ids)
+
     objects = ClientQuerySet.as_manager()
 
     class Meta:
@@ -179,7 +191,7 @@ class Contractor(BotUser):
 
     def has_order_in_work(self):
         """Есть ли заказ в работе"""
-        return len(self.orders.filter(status=Order.Status.in_work)) > 0
+        return self.orders.filter(status=Order.Status.in_work).exists()
 
     def get_order_in_work(self):
         """Получить заказ в работе"""
@@ -228,6 +240,11 @@ class Owner(BotUser):
         return f'{self.tg_nick} ({self.status})'
 
 
+class AssignedContractor(models.Model):
+    client = models.ForeignKey(Client, related_name='contractors', on_delete=models.DO_NOTHING)
+    contractor = models.ForeignKey(Contractor, related_name='clients', on_delete=models.DO_NOTHING)
+
+
 class OrderQuerySet(models.QuerySet):
     def get_warning_orders_not_in_work(self):
         """Получить список новых заказов, которые почти просрочили (долго не берут в работу)"""
@@ -268,6 +285,10 @@ class OrderQuerySet(models.QuerySet):
     def get_available(self):
         """Получить список заказов, которые можно взять в работу"""
         return self.filter(status=Order.Status.created).order_by('created_at')
+
+    def get_available_not_informed_all(self):
+        """Получить список заказов, которые можно взять в работу и по которым не проинформированы все подрядчики"""
+        return self.get_available().filter(assigned_contractors_all=False)
 
     def calculate_average_orders_in_month(self):
         """Получить помесячную (финансовый месяц) статистику по заказам"""
@@ -372,14 +393,6 @@ class Order(models.Model):
         'менеджер проинформирован что заказ долго выполняется',
         default=False,
     )
-    in_work_client_informed = models.BooleanField(
-        'клиент проинформирован что заказ взят',
-        default=False,
-    )
-    closed_client_informed = models.BooleanField(
-        'клиент проинформирован что заказ выполнен',
-        default=False,
-    )
 
     creds = models.CharField('доступы к сервису', max_length=2000, blank=True)
     estimated_hours = models.IntegerField(
@@ -387,6 +400,15 @@ class Order(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(24)],
         null=True,
         blank=True,
+    )
+
+    assigned_contractors_informed = models.BooleanField(
+        'закрепленные подрядчики проинформированы',
+        default=False,
+    )
+    all_contractors_informed = models.BooleanField(
+        'все подрядчики проинформированы',
+        default=False,
     )
 
     objects = OrderQuerySet.as_manager()

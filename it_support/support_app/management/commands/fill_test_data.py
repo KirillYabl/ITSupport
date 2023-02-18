@@ -52,18 +52,12 @@ class Command(BaseCommand):
                 tariff=random.choice([tariff_1, tariff_2, tariff_3]),
                 paid=True if i != 0 else False,
             )
-            manager = Manager(
-                tg_nick=f'testmanager{i}',
-                role=BotUser.Role.manager,
-                status=BotUser.Status.active if i != 1 else BotUser.Status.inactive,
-            )
             contractor = Contractor(
                 tg_nick=f'testcontractor{i}',
                 role=BotUser.Role.contractor,
                 status=BotUser.Status.active if i != 1 else BotUser.Status.inactive,
             )
             client.save()
-            manager.save()
             contractor.save()
         clients = Client.objects.filter(tg_nick__startswith='test')
         contractors = Contractor.objects.filter(tg_nick__startswith='test')
