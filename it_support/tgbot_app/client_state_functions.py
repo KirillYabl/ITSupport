@@ -6,6 +6,7 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.update import Update
 
 from support_app.models import Order
+from support_app.models import Contractor
 
 
 def start_client(update: Update, context: CallbackContext) -> str:
@@ -13,20 +14,27 @@ def start_client(update: Update, context: CallbackContext) -> str:
     chat_id = update.effective_chat.id
     text = 'Здравствуйте, что вы хотите?'
     client = context.user_data['user'].client
-    client_tariff = client.tariff
 
     keyboard = [
         [InlineKeyboardButton('Хочу оставить заявку', callback_data='create_order')],
         [InlineKeyboardButton('Связаться с подрядчиком', callback_data='send_message_to_contractor')],
     ]
-    if client_tariff.can_see_contractor_contacts:
+    if client.tariff.can_see_contractor_contacts:
         keyboard.append(
             [
                 InlineKeyboardButton(
                     'Хочу получить список подрядчиков, которые мне помогали',
                     callback_data='see_my_contractors'
                 )
-            ],
+            ]
+        )
+    if client.tariff.can_reserve_contractor:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    'Закрепить последнего подрядчика', callback_data='bind_contractors'
+                )
+            ]
         )
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
@@ -37,14 +45,33 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
     chat_id = update.effective_chat.id
     query = update.callback_query
     client = context.user_data['user'].client
+    client_state_buttons = ['create_order', 'get_back', 'get_back_to_order_creation', 'bind_contractors']
     keyboard = [
         [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
-    if query and query.data in ['create_order', 'get_back', 'get_back_to_order_creation']:  # client request order creation
+    if query and query.data in client_state_buttons:  # client request order creation
         if not client.has_limit_of_orders():
             message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
+        elif query and query.data == 'bind_contractors':
+            if not client.get_contractors():
+                message = 'У вас ещё не было завершенных заказов'
+                context.bot.send_message(text=message, chat_id=chat_id)
+                return start_client(update, context)
+            last_contractor = Contractor.objects.get(
+                tg_nick=client.get_contractors().first()['contractor__tg_nick']
+            )
+            if client.is_assigned_contractor(last_contractor):
+                message = f'За вами уже закреплен подрядчик @{last_contractor.tg_nick}'
+            else:
+                last_contractor = Contractor.objects.get(
+                    tg_nick=client.get_contractors().first()['contractor__tg_nick']
+                )
+                client.assign_contractor(last_contractor)
+                message = f'Вы закрепили за собой подрядчика @{last_contractor.tg_nick}'
+            context.bot.send_message(text=message, chat_id=chat_id)
+            return start_client(update, context)
         elif client.has_active_order():
             message = 'Ваша заявка ещё в обработке, пожалуйста ожидайте'
         else:
@@ -69,10 +96,13 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
             context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
             return 'WAIT_MESSAGE_TO_CONTRACTOR_CLIENT'
     elif query and query.data == 'see_my_contractors':  # client request to see his contractors
-        message = 'На вашем тарифе нет такой функции, купите VIP тариф для подобной функции'
-        if client.tariff.can_see_contractor_contacts:
+        if not client.tariff.can_see_contractor_contacts:
+            message = 'На вашем тарифе нет такой функции, купите VIP тариф для подобной функции'
+        elif client.get_contractors():
             client_contractors = client.get_contractors()
             message = '\n'.join([f'@{contractor["contractor__tg_nick"]}' for contractor in client_contractors])
+        else:
+            message = 'У вас ещё не было завершенных заказов'
 
     context.bot.send_message(chat_id=chat_id, text=message)
     return start_client(update, context)

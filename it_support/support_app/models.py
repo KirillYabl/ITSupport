@@ -144,7 +144,7 @@ class Client(BotUser):
 
     def is_assigned_contractor(self, contractor):
         """Это закрепленный подрядчик?"""
-        return self.contractors.filter(pk=contractor.pk).exists()
+        return self.contractors.filter(contractor=contractor).exists()
 
     def get_not_assigned_contractors(self):
         """Получить всех не закрепленных свободных подрядчиков"""
