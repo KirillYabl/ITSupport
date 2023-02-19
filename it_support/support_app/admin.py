@@ -31,3 +31,13 @@ class TariffAdmin(admin.ModelAdmin):
 @admin.register(m.Order)
 class OrderAdmin(admin.ModelAdmin):
     pass
+
+
+@admin.register(m.AssignedContractor)
+class AssignedContractorAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(m.SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    pass

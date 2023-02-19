@@ -244,6 +244,13 @@ class AssignedContractor(models.Model):
     client = models.ForeignKey(Client, related_name='contractors', on_delete=models.DO_NOTHING)
     contractor = models.ForeignKey(Contractor, related_name='clients', on_delete=models.DO_NOTHING)
 
+    class Meta:
+        verbose_name = 'закрепленный подрядчик'
+        verbose_name_plural = 'закрепленные подрядчики'
+
+    def __str__(self):
+        return f'{self.contractor} закреплен за ({self.client})'
+
 
 class OrderQuerySet(models.QuerySet):
     def get_warning_orders_not_in_work(self):
@@ -468,3 +475,10 @@ class SystemSettings(models.Model):
         help_text='может быть пустой строкой, тогда метод которому это нужно сам придумает дефолт',
     )
     description = models.TextField('описание параметра')
+
+    class Meta:
+        verbose_name = 'системный параметр'
+        verbose_name_plural = 'системные параметры'
+
+    def __str__(self):
+        return f'{self.parameter_name} - {self.parameter_value}'
