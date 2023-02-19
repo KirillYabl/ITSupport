@@ -57,14 +57,14 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
         elif query and query.data == 'bind_contractors':
             if not client.get_contractors():
                 message = 'У вас ещё не было завершенных заказов'
+                context.bot.send_message(text=message, chat_id=chat_id)
+                return start_client(update, context)
+            last_contractor = Contractor.objects.get(
+                tg_nick=client.get_contractors().first()['contractor__tg_nick']
+            )
+            if client.is_assigned_contractor(last_contractor):
+                message = f'За вами уже закреплен подрядчик @{last_contractor.tg_nick}'
             else:
-                not_assigned_contractors = client.get_not_assigned_contractors()
-                for not_assigned_contractor in not_assigned_contractors:
-                    if client.is_assigned_contractor(not_assigned_contractor):
-                        message = f'За вами уже закреплен подрядчик @{not_assigned_contractor.tg_nick}'
-                        context.bot.send_message(text=message, chat_id=chat_id)
-                        return start_client(update, context)
-
                 last_contractor = Contractor.objects.get(
                     tg_nick=client.get_contractors().first()['contractor__tg_nick']
                 )
