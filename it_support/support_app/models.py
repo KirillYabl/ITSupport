@@ -340,7 +340,7 @@ class OrderQuerySet(models.QuerySet):
             status=Order.Status.cancelled,
         ).filter(
             closed_at__gt=prev_billing_start_date,
-            closed_at__lte=prev_billing_start_date + relativedelta.relativedelta(month=2),  # не понял почему, но 2
+            closed_at__lte=prev_billing_start_date + relativedelta.relativedelta(months=1),
         ).select_related('contractor').values('contractor__tg_nick').annotate(count_orders=Count('id'))
 
 
