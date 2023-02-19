@@ -262,12 +262,17 @@ class OrderQuerySet(models.QuerySet):
         warning_orders_ids = []
         tariffs = Tariff.objects.all()
 
+        try:
+            limit = SystemSettings.objects.get('INFORM_MANAGER_CREATED_PROJECT_LIMIT').parameter_value
+            limit = int(limit) / 100
+        except (SystemSettings.DoesNotExist, ValueError):
+            limit = 0.95
+
         # TODO: написать через аннотейты
         for tariff in tariffs:
             tariff_orders = orders_not_in_work.filter(client__tariff=tariff)
             for tariff_order in tariff_orders:
                 not_in_work_time = timezone.now() - tariff_order.created_at
-                limit = 0.95
                 tariff_limit_seconds = tariff.reaction_time_minutes * 60
                 if not_in_work_time.total_seconds() / tariff_limit_seconds > limit:
                     warning_orders_ids.append(tariff_order.pk)
@@ -281,10 +286,15 @@ class OrderQuerySet(models.QuerySet):
         )
         warning_orders_ids = []
 
+        try:
+            limit = SystemSettings.objects.get('INFORM_MANAGER_IN_WORK_PROJECT_LIMIT').parameter_value
+            limit = int(limit) / 100
+        except (SystemSettings.DoesNotExist, ValueError):
+            limit = 0.95
+
         for order in orders_not_closed:
             not_closed_time = timezone.now() - order.assigned_at
             limit_seconds = 60 * 60 * 24  # TODO: добавить эстимейты
-            limit = 0.95
             if not_closed_time.total_seconds() / limit_seconds > limit:
                 warning_orders_ids.append(order.pk)
         return self.filter(pk__in=warning_orders_ids)

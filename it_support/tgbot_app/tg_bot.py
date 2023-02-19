@@ -15,6 +15,7 @@ from support_app.models import BotUser
 from support_app.models import Manager
 from support_app.models import Contractor
 from support_app.models import Order
+from support_app.models import SystemSettings
 
 
 def get_user(func: Callable) -> Callable:
@@ -172,6 +173,14 @@ class TgBot(object):
         )
         available_contractors = Contractor.objects.get_available()
 
+        try:
+            assigned_contractors_limit = SystemSettings.objects.get(
+                'ASSIGNED_CONTRACTORS_TIME_LIMIT'
+            ).parameter_value
+            assigned_contractors_limit = int(assigned_contractors_limit) / 100
+        except (SystemSettings.DoesNotExist, ValueError):
+            assigned_contractors_limit = 0.2
+
         # it can be not optimal if many new orders but it should be about 5 orders in hour
         # so it not a big chance to have more then 2 orders simultaneously
         # also it send message to many contractors but telegram don't have bulk message :(
@@ -198,7 +207,6 @@ class TgBot(object):
                 # check if time for assigned contractors or all
                 client_tariff_reaction_time_seconds = new_order.client.tariff.reaction_time_minutes * 60
                 seconds_from_created = (timezone.now() - new_order.created_at).total_seconds()
-                assigned_contractors_limit = 0.2  # TODO system parameter
                 is_inform_only_assigned_contractors = False
                 if seconds_from_created / client_tariff_reaction_time_seconds < assigned_contractors_limit:
                     is_inform_only_assigned_contractors = True
