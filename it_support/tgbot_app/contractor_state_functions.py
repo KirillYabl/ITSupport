@@ -6,6 +6,7 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.update import Update
 
 from support_app.models import Order
+from support_app.models import Client
 
 
 def start_contractor(update: Update, context: CallbackContext) -> str:
@@ -88,8 +89,17 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             order_in_work = contractor.get_order_in_work()
             client_chat_id = order_in_work.client.telegram_id
             order_in_work.close_work()
-            message_to_client = dedent('''Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
-                                          Если вам нужна будет помощь, мы рядом!''')
+            client = Client.objects.get(telegram_id=client_chat_id)
+            message_to_client = dedent('''
+            Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
+            Если вам нужна будет помощь, мы рядом!
+            ''')
+            if client.tariff.can_reserve_contractor:
+                message_to_client += 'Вы можете закрепить последнего подрядчика.'
+                context.bot.send_message(
+                    text=message_to_client,
+                    chat_id=client_chat_id,
+                )
             context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
             message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
     elif query and query.data == 'my_salary':  # contractor request to get his salary in this month
