@@ -96,10 +96,6 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             ''')
             if client.tariff.can_reserve_contractor:
                 message_to_client += 'Вы можете закрепить последнего подрядчика.'
-                context.bot.send_message(
-                    text=message_to_client,
-                    chat_id=client_chat_id,
-                )
             context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
             message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
     elif query and query.data == 'my_salary':  # contractor request to get his salary in this month

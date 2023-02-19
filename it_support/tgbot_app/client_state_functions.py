@@ -28,6 +28,7 @@ def start_client(update: Update, context: CallbackContext) -> str:
                 )
             ]
         )
+    if client.tariff.can_reserve_contractor:
         keyboard.append(
             [
                 InlineKeyboardButton(
@@ -44,13 +45,13 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
     chat_id = update.effective_chat.id
     query = update.callback_query
     client = context.user_data['user'].client
-    buttons_states = ['create_order', 'get_back', 'get_back_to_order_creation', 'bind_contractors']
+    client_state_buttons = ['create_order', 'get_back', 'get_back_to_order_creation', 'bind_contractors']
     keyboard = [
         [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
-    if query and query.data in buttons_states:  # client request order creation
+    if query and query.data in client_state_buttons:  # client request order creation
         if not client.has_limit_of_orders():
             message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
         elif query and query.data == 'bind_contractors':
