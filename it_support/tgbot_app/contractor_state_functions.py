@@ -105,6 +105,11 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         order_pk = query.data.split('|')[-1]
         bad_scenario = False
 
+        if contractor.has_order_in_work():
+            message = 'У вас уже есть активный заказ в работе'
+            context.bot.send_message(text=message, chat_id=chat_id)
+            return start_contractor(update, context)
+
         # check if order exist
         try:
             order = Order.objects.get(pk=int(order_pk))
