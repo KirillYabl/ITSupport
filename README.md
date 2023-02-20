@@ -63,6 +63,64 @@ python manage.py runserver
 python manage.py start_bot
 ```
 
+## Как запустить prod версию
+
+Проект скачиваем в директорию `/opt`.
+
+Устанавливаем все необходимые зависимости. (см. пункт `Как установить`)
+
+Также после сделанной миграции вам неободимо подтянуть всю статику командой:
+
+```
+python manage.py collectstatic
+```
+
+Параметры запуска проекта через systemctl смотрите ниже:
+* Файл для запуска самой Django:
+```
+[Unit]
+Description=Django for Telegram bot
+
+[Service]
+WorkingDirectory=/opt/ITSupport/it_support
+ExecStart=/opt/ITSupport/venv/bin/gunicorn -w 3 -b 127.0.0.1:8100 it_support.wsgi:application
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+* Файл для запуска бота:
+
+```
+[Unit]
+Description=Telegram bot on Django
+Requires=django_bot.service
+
+[Service]
+WorkingDirectory=/opt/ITSupport/it_support
+ExecStart=/opt/ITSupport/venv/bin/python3 manage.py start_bot
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+Параметры Nginx:
+```
+server {
+  listen 11.111.111.111:80;  # Вместо единиц укажите ip вашего сервера  
+
+  location / {
+    include '/etc/nginx/proxy_params';
+    proxy_pass http://127.0.0.1:8100/;
+  }
+
+  location /static/ {
+    alias /opt/ITSupport/it_support/staticfiles/;
+  }
+}
+```
+Уже после данных настроек можно всё активировать и пользоваться админкой на удаленном сервере.
+
 ## Системные параметры
 
 Системные параметры управляют поведением бота, внести их и изменить пожно в админ модели по адресу /admin/support_app/systemsettings/
