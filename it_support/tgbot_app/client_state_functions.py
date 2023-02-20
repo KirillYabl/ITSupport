@@ -6,7 +6,6 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.update import Update
 
 from support_app.models import Order
-from support_app.models import Contractor
 
 
 def start_client(update: Update, context: CallbackContext) -> str:
@@ -131,6 +130,7 @@ def wait_message_to_contractor_client(update: Update, context: CallbackContext) 
 
 
 def waiting_order_task(update: Update, context: CallbackContext) -> str:
+    """Handler of waiting client task for order"""
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -148,14 +148,15 @@ def waiting_order_task(update: Update, context: CallbackContext) -> str:
         context.user_data['creating_order_task'] = order_task
         message = 'Пришлите логин и пароль одним сообщением.\nПример:\nЛогин: Иван\nПароль: qwerty'
         keyboard = [
-                    [InlineKeyboardButton('Вернуться назад', callback_data='get_back_to_order_creation')],
-                ]
+            [InlineKeyboardButton('Вернуться назад', callback_data='get_back_to_order_creation')],
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
         return 'WAITING_CREDENTIALS'
 
 
 def waiting_credentials(update: Update, context: CallbackContext) -> str:
+    """Handler of waiting client credentials"""
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -179,17 +180,10 @@ def waiting_credentials(update: Update, context: CallbackContext) -> str:
     else:
         hours = client.tariff.orders_limit // 60
         minutes = client.tariff.orders_limit % 60
+        # TODO: шифрование кредсов
         order = Order(task=order_task, client=client, creds=credentials)
         order.save()
         context.user_data['creating_order_task'] = None
         message = f'Спасибо! Ваш заказ успешно создан.\nЗаказ будет взят в течении {hours} ч. {minutes} мин.'
         context.bot.send_message(chat_id=chat_id, text=message)
         return start_client(update, context)
-
-
-def start_not_found(update: Update, context: CallbackContext) -> str:
-    """Unknown start function which send a menu"""
-    chat_id = update.effective_chat.id
-    message = 'Вы не являетесь нашим клиентом, пожалуйста обратитесь к менеджеру'
-    context.bot.send_message(text=message, schat_id=chat_id)
-    return 'START'

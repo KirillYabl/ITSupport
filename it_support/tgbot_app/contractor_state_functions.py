@@ -6,7 +6,7 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.update import Update
 
 from support_app.models import Order
-from support_app.models import Client
+from support_app.models import SystemSettings
 
 
 def start_contractor(update: Update, context: CallbackContext) -> str:
@@ -38,7 +38,7 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         При появлении новых заказов вам будет приходить уведомление,
         где вы можете взять заказ в работу
                              
-        Также текущие доступные заказы вы можете посотреть по кнопке "Посмотреть заказы"
+        Также текущие доступные заказы вы можете посмотреть по кнопке "Посмотреть заказы"
                              
         Когда вы возьмете заказ вам придет логин и пароль от админки клиента
                              
@@ -52,12 +52,12 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         периоде вы можете по кнопке "Мой заработок за месяц"
         ''')
     elif query and query.data == 'watch_orders':  # contractor request to watch list of available orders
-        available_orders = Order.objects.get_available()
+        available_orders = list(Order.objects.get_available())
         if not available_orders:
             message = 'Нет заказов, которые можно взять в работу'
             context.bot.send_message(text=message, chat_id=chat_id)
             return start_contractor(update, context)
-        for order in available_orders:
+        for i, order in enumerate(available_orders):
             # send every order in different message because it contains button to take order
             message = dedent(f'''
             Задание:
@@ -66,7 +66,7 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             keyboard = [
                 [InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')],
             ]
-            if order == list(available_orders)[-1]:
+            if i == len(available_orders) - 1:
                 keyboard.append([InlineKeyboardButton('Вернуться назад', callback_data='get_back')])
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
@@ -87,26 +87,33 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             order_in_work = contractor.get_order_in_work()
             client_chat_id = order_in_work.client.telegram_id
             order_in_work.close_work()
-            client = Client.objects.get(telegram_id=client_chat_id)
+            # also notify client
             message_to_client = dedent('''
             Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
             Если вам нужна будет помощь, мы рядом!
             ''')
-            if client.tariff.can_reserve_contractor:
+            if order_in_work.client.tariff.can_reserve_contractor:
                 message_to_client += 'Вы можете закрепить последнего подрядчика.'
             context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
             message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
     elif query and query.data == 'my_salary':  # contractor request to get his salary in this month
         closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
-        order_rate = 500  # TODO get normal order rate from DB
+        try:
+            order_rate = int(SystemSettings.objects.get(
+                'ORDER_RATE'
+            ).parameter_value)
+        except (SystemSettings.DoesNotExist, ValueError):
+            order_rate = 500
         salary = closed_orders_count * order_rate
-        message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {salary}'
+        message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {salary} руб.'
     elif query and query.data.startswith('take_order'):  # contractor request to take order
         order_pk = query.data.split('|')[-1]
         bad_scenario = False
 
         if contractor.has_order_in_work():
+            # it unnature limit, because now messages and close work not support many orders
             message = 'У вас уже есть активный заказ в работе'
+            # fast send message and return for not spend time in checks below
             context.bot.send_message(text=message, chat_id=chat_id)
             return start_contractor(update, context)
 
@@ -197,6 +204,7 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
                 context.user_data['order_in_process'] = None
                 message_to_client = 'Ваш заказ взят работу! При выполнении пришлем уведомление.'
                 context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
+                # TODO: дешифрование кредсов
                 message = dedent(f'''
                 Заказ успешно взят в работу, приятной работы
                 

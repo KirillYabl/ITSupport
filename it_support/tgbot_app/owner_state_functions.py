@@ -76,7 +76,6 @@ def process_bot_user(update: Update, context: CallbackContext, username: str, ro
         # check username
         if not (5 <= len(username) <= 32):
             message.append('Длина имени пользователя должна быть от 5 до 32 символов')
-
         if not re.findall(BotUser.REGEX_TELEGRAM_NICKNAME, username):
             message.append('Username должен состоять из английских букв любого регистра, цифр и подчеркивания')
 
@@ -92,24 +91,17 @@ def process_bot_user(update: Update, context: CallbackContext, username: str, ro
                 # client should have tariff
 
                 # looking for easy tariff
-                params['tariff'] = Tariff.objects.exclude(
-                    name__startswith='test',
-                ).filter(
+                tariffs = Tariff.objects.exclude(name__startswith='test')
+                params['tariff'] = tariffs.filter(
                     can_reserve_contractor=False,
                     can_see_contractor_contacts=False,
                 ).first()
                 if params['tariff'] is None:
                     # looking for medium tariff
-                    params['tariff'] = Tariff.objects.exclude(
-                        name__startswith='test',
-                    ).filter(
-                        can_reserve_contractor=False,
-                    ).first()
+                    params['tariff'] = tariffs.filter(can_reserve_contractor=False).first()
                 if params['tariff'] is None:
                     # looking for any tariff
-                    params['tariff'] = Tariff.objects.exclude(
-                        name__startswith='test',
-                    ).first()
+                    params['tariff'] = tariffs.first()
                 params['paid'] = True
                 message = ['Пользователь успешно создан с тарифом эконом по умолчанию']
             role_to_model[role]['model'].objects.create(**params)

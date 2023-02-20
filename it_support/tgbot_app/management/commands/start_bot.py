@@ -28,7 +28,7 @@ from tgbot_app.owner_state_functions import waiting_username_contractor_delete
 from tgbot_app.owner_state_functions import waiting_username_manager_delete
 from tgbot_app.owner_state_functions import waiting_username_owner_delete
 
-from tgbot_app.client_state_functions import start_not_found
+from tgbot_app.unknown_state_functions import start_not_found
 
 
 class Command(BaseCommand):
