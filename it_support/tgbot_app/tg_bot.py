@@ -18,6 +18,10 @@ from support_app.models import Client
 from support_app.models import Order
 from support_app.models import SystemSettings
 
+import logging
+
+logger = logging.getLogger('tgbot_app_error')
+
 
 def get_user(func: Callable) -> Callable:
     """Decorator to add user in context when telegram handlers starts"""
@@ -127,6 +131,7 @@ class TgBot(object):
     def error(self, update: Update, context: CallbackContext) -> None:
         """Error handler"""
         print(f'Update "{update}" caused error "{context.error}"')
+        logger.error(f'caused error "{context.error}"')
         raise context.error
 
     def help_handler(self, update: Update, context: CallbackContext) -> None:
