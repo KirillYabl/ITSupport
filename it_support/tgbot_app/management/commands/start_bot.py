@@ -19,6 +19,14 @@ from tgbot_app.contractor_state_functions import wait_estimate_contractor
 
 from tgbot_app.owner_state_functions import start_owner
 from tgbot_app.owner_state_functions import handle_menu_owner
+from tgbot_app.owner_state_functions import waiting_username_client_add
+from tgbot_app.owner_state_functions import waiting_username_contractor_add
+from tgbot_app.owner_state_functions import waiting_username_manager_add
+from tgbot_app.owner_state_functions import waiting_username_owner_add
+from tgbot_app.owner_state_functions import waiting_username_client_delete
+from tgbot_app.owner_state_functions import waiting_username_contractor_delete
+from tgbot_app.owner_state_functions import waiting_username_manager_delete
+from tgbot_app.owner_state_functions import waiting_username_owner_delete
 
 from tgbot_app.client_state_functions import start_not_found
 
@@ -54,7 +62,15 @@ def start_bot():
             },
             'Владелец': {
                 'START': start_owner,
-                'HANDLE_MENU_OWNER': handle_menu_owner
+                'HANDLE_MENU_OWNER': handle_menu_owner,
+                'WAITING_USERNAME_CLIENT_ADD': waiting_username_client_add,
+                'WAITING_USERNAME_CONTRACTOR_ADD': waiting_username_contractor_add,
+                'WAITING_USERNAME_MANAGER_ADD': waiting_username_manager_add,
+                'WAITING_USERNAME_OWNER_ADD': waiting_username_owner_add,
+                'WAITING_USERNAME_CLIENT_DELETE': waiting_username_client_delete,
+                'WAITING_USERNAME_CONTRACTOR_DELETE': waiting_username_contractor_delete,
+                'WAITING_USERNAME_MANAGER_DELETE': waiting_username_manager_delete,
+                'WAITING_USERNAME_OWNER_DELETE': waiting_username_owner_delete,
             },
             'unknown': {
                 'START': start_not_found,
