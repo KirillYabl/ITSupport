@@ -141,3 +141,42 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'user_app.User'
 
 TELEGRAM_ACCESS_TOKEN = env.str('TELEGRAM_ACCESS_TOKEN')
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'info_string': {
+            'format': '{name}  {levelname}  {asctime}  {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'info_file': {
+            'class': 'logging.FileHandler',
+            'filename': 'info.log',
+            'level': 'INFO',
+            'formatter': 'info_string'
+        },
+        'error_file': {
+            'class': 'logging.FileHandler',
+            'filename': 'error.log',
+            'level': 'ERROR',
+            'formatter': 'info_string'
+        },
+    },
+    'loggers': {
+        'tgbot_app_info': {
+            'handlers': ['info_file'],
+            'level': 'INFO',
+            'propagete': True,
+        },
+        'tgbot_app_error': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagete': True,
+        },
+    },
+}
