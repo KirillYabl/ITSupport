@@ -14,6 +14,7 @@ from telegram.update import Update
 from support_app.models import BotUser
 from support_app.models import Manager
 from support_app.models import Contractor
+from support_app.models import Client
 from support_app.models import Order
 from support_app.models import SystemSettings
 
@@ -155,8 +156,7 @@ class TgBot(object):
             return
         message = 'Есть заказы, которые не выполнены\n\n' + '\n'.join(
             [
-                f'Задача: {order.task}\nКонтакт подрядчика: @{order.contractor.tg_nick}\n' +
-                f'Контакт клиента: @{order.client.tg_nick}\n\n'
+                f'Задача: {order.task}\nКонтакт подрядчика: @{order.contractor.tg_nick}\nКонтакт клиента: @{order.client.tg_nick}\n\n'
                 for order in warning_orders_not_closed
             ]
         )
@@ -204,26 +204,42 @@ class TgBot(object):
                     new_order.all_contractors_informed = True
                     new_order.save()
             else:
-                # check if time for assigned contractors or all
-                client_tariff_reaction_time_seconds = new_order.client.tariff.reaction_time_minutes * 60
-                seconds_from_created = (timezone.now() - new_order.created_at).total_seconds()
-                is_inform_only_assigned_contractors = False
-                if seconds_from_created / client_tariff_reaction_time_seconds < assigned_contractors_limit:
-                    is_inform_only_assigned_contractors = True
+                self.process_new_order_with_contractors(
+                    context,
+                    new_order,
+                    client,
+                    assigned_contractors_limit,
+                    message,
+                )
 
-                # check that assigned contractors weren't informed too
-                if is_inform_only_assigned_contractors and not new_order.assigned_contractors_informed:
-                    for contractor in client.contractors.all():
-                        contractor_chat_id = contractor.telegram_id
-                        context.bot.send_message(text=message, chat_id=contractor_chat_id)
-                        new_order.assigned_contractors_informed = True
-                        new_order.save()
-                elif not is_inform_only_assigned_contractors:
-                    # inform all contractors except assigned
-                    for contractor in client.get_not_assigned_contractors():
-                        contractor_chat_id = contractor.telegram_id
-                        context.bot.send_message(text=message, chat_id=contractor_chat_id)
-                        with atomic():
-                            new_order.assigned_contractors_informed = True  # just for be sure
-                            new_order.all_contractors_informed = True
-                            new_order.save()
+    def process_new_order_with_contractors(
+            self,
+            context: CallbackContext,
+            new_order: Order,
+            client: Client,
+            assigned_contractors_limit: float,
+            message: str,
+    ):
+        # check if time for assigned contractors or all
+        client_tariff_reaction_time_seconds = new_order.client.tariff.reaction_time_minutes * 60
+        seconds_from_created = (timezone.now() - new_order.created_at).total_seconds()
+        is_inform_only_assigned_contractors = False
+        if seconds_from_created / client_tariff_reaction_time_seconds < assigned_contractors_limit:
+            is_inform_only_assigned_contractors = True
+
+        # check that assigned contractors weren't informed too
+        if is_inform_only_assigned_contractors and not new_order.assigned_contractors_informed:
+            for contractor in client.contractors.all():
+                contractor_chat_id = contractor.telegram_id
+                context.bot.send_message(text=message, chat_id=contractor_chat_id)
+                new_order.assigned_contractors_informed = True
+                new_order.save()
+        elif not is_inform_only_assigned_contractors:
+            # inform all contractors except assigned
+            for contractor in client.get_not_assigned_contractors():
+                contractor_chat_id = contractor.telegram_id
+                context.bot.send_message(text=message, chat_id=contractor_chat_id)
+                with atomic():
+                    new_order.assigned_contractors_informed = True  # just for be sure
+                    new_order.all_contractors_informed = True
+                    new_order.save()

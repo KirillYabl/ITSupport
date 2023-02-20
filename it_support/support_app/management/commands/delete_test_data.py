@@ -1,11 +1,6 @@
-import random
-from decimal import Decimal
-
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from support_app.models import Order
-from support_app.models import BotUser
 from support_app.models import Client
 from support_app.models import Manager
 from support_app.models import Contractor

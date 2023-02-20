@@ -7,6 +7,7 @@ from telegram.update import Update
 
 from support_app.models import Order
 from support_app.models import SystemSettings
+from support_app.models import Contractor
 
 
 def start_contractor(update: Update, context: CallbackContext) -> str:
@@ -24,11 +25,159 @@ def start_contractor(update: Update, context: CallbackContext) -> str:
     return 'HANDLE_MENU_CONTRACTOR'
 
 
+def handle_watch_orders_callback(
+        update: Update,
+        context: CallbackContext,
+        chat_id: str,
+) -> tuple[bool, str, str]:
+    """
+    Handling watch orders callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    available_orders = list(Order.objects.get_available())
+    if not available_orders:
+        message = 'Нет заказов, которые можно взять в работу'
+        context.bot.send_message(text=message, chat_id=chat_id)
+        return True, start_contractor(update, context), ''
+    for i, order in enumerate(available_orders):
+        # send every order in different message because it contains button to take order
+        message = dedent(f'''
+                Задание:
+                {order.task}
+                ''')
+        keyboard = [
+            [InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')],
+        ]
+        if i == len(available_orders) - 1:
+            keyboard.append([InlineKeyboardButton('Вернуться назад', callback_data='get_back')])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
+    return True, 'HANDLE_MENU_CONTRACTOR', ''
+
+
+def handle_send_message_to_client_callback(
+        context: CallbackContext,
+        contractor: Contractor,
+        chat_id: str,
+) -> tuple[bool, str, str]:
+    """
+    Handling send message to client callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    message = 'У вас нет активного заказа'
+    if contractor.has_order_in_work():
+        message = 'Напишите сообщение клиенту'
+        keyboard = [
+            [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
+        return True, 'WAIT_MESSAGE_TO_CLIENT_CONTRACTOR', ''
+    return False, '', message
+
+
+def handle_take_order_callback(
+        update: Update,
+        context: CallbackContext,
+        contractor: Contractor,
+        chat_id: str,
+) -> tuple[bool, str, str]:
+    """
+    Handling take order callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    order_pk = update.query.data.split('|')[-1]
+    bad_scenario = False
+
+    if contractor.has_order_in_work():
+        # it unnature limit, because now messages and close work not support many orders
+        message = 'У вас уже есть активный заказ в работе'
+        # fast send message and return for not spend time in checks below
+        context.bot.send_message(text=message, chat_id=chat_id)
+        return True, start_contractor(update, context), ''
+
+    # check if order exist
+    try:
+        order = Order.objects.get(pk=int(order_pk))
+    except (Order.DoesNotExist, ValueError):
+        order = None
+        message = 'Что-то пошло не так, заказ не найден, попробуйте снова получить список заказов'
+        bad_scenario = True
+
+    # check if not blocked by another contractor
+    if order is not None and order.status != Order.Status.created:
+        message = 'К сожалению заказ уже взяли, попробуйте снова получить список заказов'
+        bad_scenario = True
+
+    if not bad_scenario:
+        message = dedent('''
+                Пришлите приблизительную оценку требуемого на выполнения времени в часах
+                Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени
+                обратитесь к менеджерам, мы не оказываем проектную поддержку
+                ''')
+        context.user_data['order_in_process'] = order
+        keyboard = [
+            [InlineKeyboardButton('Вернуться в начало', callback_data='return_to_start')],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
+        return True, 'WAIT_ESTIMATE_CONTRACTOR', ''
+    return False, '', message
+
+
+def handle_close_order_callback(
+        context: CallbackContext,
+        contractor: Contractor,
+) -> tuple[bool, str, str]:
+    """
+    Handling close order callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    message = 'У вас нет активного заказа'
+    if contractor.has_order_in_work():
+        order_in_work = contractor.get_order_in_work()
+        client_chat_id = order_in_work.client.telegram_id
+        order_in_work.close_work()
+        # also notify client
+        message_to_client = dedent('''
+                Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
+                Если вам нужна будет помощь, мы рядом!
+                ''')
+        if order_in_work.client.tariff.can_reserve_contractor:
+            message_to_client += 'Вы можете закрепить последнего подрядчика.'
+        context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
+        message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
+    return False, '', message
+
+
+def handle_my_salary_callback(contractor: Contractor, ) -> tuple[bool, str, str]:
+    """
+    Handling my salary callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
+    try:
+        order_rate = int(SystemSettings.objects.get(
+            'ORDER_RATE'
+        ).parameter_value)
+    except (SystemSettings.DoesNotExist, ValueError):
+        order_rate = 500
+    salary = closed_orders_count * order_rate
+    message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {salary} руб.'
+    return False, '', message
+
+
 def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
     """Manager menu handler"""
     chat_id = update.effective_chat.id
     query = update.callback_query
     contractor = context.user_data['user'].contractor
+    is_call_handlers = False
 
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
     if query and query.data in ['get_back', 'return_to_start']:
@@ -37,112 +186,38 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         message = dedent('''
         При появлении новых заказов вам будет приходить уведомление,
         где вы можете взять заказ в работу
-                             
+
         Также текущие доступные заказы вы можете посмотреть по кнопке "Посмотреть заказы"
-                             
+
         Когда вы возьмете заказ вам придет логин и пароль от админки клиента
-                             
+
         Если у вас возникнут вопросы, вы всегда можете задать их заказчику по кнопке "Написать заказчику"
-        
+
         Как только заказчик вам ответит вам придет уведомление
-        
+
         После завершения заказа нажмите на кнопку "Завершить заказ"
-        
+
         Посмотреть сколько заказов вы выполнили и заработает при очередном финансовом
         периоде вы можете по кнопке "Мой заработок за месяц"
         ''')
     elif query and query.data == 'watch_orders':  # contractor request to watch list of available orders
-        available_orders = list(Order.objects.get_available())
-        if not available_orders:
-            message = 'Нет заказов, которые можно взять в работу'
-            context.bot.send_message(text=message, chat_id=chat_id)
-            return start_contractor(update, context)
-        for i, order in enumerate(available_orders):
-            # send every order in different message because it contains button to take order
-            message = dedent(f'''
-            Задание:
-            {order.task}
-            ''')
-            keyboard = [
-                [InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')],
-            ]
-            if i == len(available_orders) - 1:
-                keyboard.append([InlineKeyboardButton('Вернуться назад', callback_data='get_back')])
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
-        return 'HANDLE_MENU_CONTRACTOR'
+        is_return, what_return, message = handle_watch_orders_callback(update, context, chat_id)
+        is_call_handlers = True
     elif query and query.data == 'send_message_to_client':  # contractor request to send message to client
-        message = 'У вас нет активного заказа'
-        if contractor.has_order_in_work():
-            message = 'Напишите сообщение клиенту'
-            keyboard = [
-                [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
-            return 'WAIT_MESSAGE_TO_CLIENT_CONTRACTOR'
+        is_return, what_return, message = handle_send_message_to_client_callback(context, contractor, chat_id)
+        is_call_handlers = True
     elif query and query.data == 'close_order':  # contractor request to close active order
-        message = 'У вас нет активного заказа'
-        if contractor.has_order_in_work():
-            order_in_work = contractor.get_order_in_work()
-            client_chat_id = order_in_work.client.telegram_id
-            order_in_work.close_work()
-            # also notify client
-            message_to_client = dedent('''
-            Подрядчик выполнил ваш заказ, делаем успехов в вашем бизнесе!
-            Если вам нужна будет помощь, мы рядом!
-            ''')
-            if order_in_work.client.tariff.can_reserve_contractor:
-                message_to_client += 'Вы можете закрепить последнего подрядчика.'
-            context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
-            message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
+        is_return, what_return, message = handle_close_order_callback(context, contractor)
+        is_call_handlers = True
     elif query and query.data == 'my_salary':  # contractor request to get his salary in this month
-        closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
-        try:
-            order_rate = int(SystemSettings.objects.get(
-                'ORDER_RATE'
-            ).parameter_value)
-        except (SystemSettings.DoesNotExist, ValueError):
-            order_rate = 500
-        salary = closed_orders_count * order_rate
-        message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {salary} руб.'
+        is_return, what_return, message = handle_my_salary_callback(context, contractor)
+        is_call_handlers = True
     elif query and query.data.startswith('take_order'):  # contractor request to take order
-        order_pk = query.data.split('|')[-1]
-        bad_scenario = False
+        is_return, what_return, message = handle_take_order_callback(update, context, contractor, chat_id)
+        is_call_handlers = True
 
-        if contractor.has_order_in_work():
-            # it unnature limit, because now messages and close work not support many orders
-            message = 'У вас уже есть активный заказ в работе'
-            # fast send message and return for not spend time in checks below
-            context.bot.send_message(text=message, chat_id=chat_id)
-            return start_contractor(update, context)
-
-        # check if order exist
-        try:
-            order = Order.objects.get(pk=int(order_pk))
-        except (Order.DoesNotExist, ValueError):
-            order = None
-            message = 'Что-то пошло не так, заказ не найден, попробуйте снова получить список заказов'
-            bad_scenario = True
-
-        # check if not blocked by another contractor
-        if order is not None and order.status != Order.Status.created:
-            message = 'К сожалению заказ уже взяли, попробуйте снова получить список заказов'
-            bad_scenario = True
-
-        if not bad_scenario:
-            message = dedent('''
-            Пришлите приблизительную оценку требуемого на выполнения времени в часах
-            Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени
-            обратитесь к менеджерам, мы не оказываем проектную поддержку
-            ''')
-            context.user_data['order_in_process'] = order
-            keyboard = [
-                [InlineKeyboardButton('Вернуться в начало', callback_data='return_to_start')],
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
-            return 'WAIT_ESTIMATE_CONTRACTOR'
+    if is_call_handlers and is_return:
+        return what_return
 
     context.bot.send_message(text=message, chat_id=chat_id)
 
@@ -207,7 +282,7 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
                 # TODO: дешифрование кредсов
                 message = dedent(f'''
                 Заказ успешно взят в работу, приятной работы
-                
+
                 Доступы к сайту:
                 {order_in_process.creds}
                 ''')

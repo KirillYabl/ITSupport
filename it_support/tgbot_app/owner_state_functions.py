@@ -4,6 +4,7 @@ import random
 import re
 import time
 from functools import partial
+from typing import Any
 
 from telegram import InlineKeyboardButton
 from telegram import InlineKeyboardMarkup
@@ -36,6 +37,55 @@ def send_data_in_csv_file(update: Update, context: CallbackContext, filename: st
             pass
 
 
+def process_bot_user_add(role_to_model: dict[BotUser.Role, dict[str, Any]], username: str, role: Client.Role) -> str:
+    message = []
+    # check if this user not exists as active in all roles
+    for model_role in role_to_model.keys():
+        has_user_with_this_name = role_to_model[model_role]['model'].objects.active().filter(
+            role__in=list(role_to_model.keys()),
+            tg_nick=username,
+        ).exists()
+        if has_user_with_this_name:
+            message.append(
+                f'Уже есть активный пользователь с ролью "{role_to_model[role]["name"]}" с таким username'
+            )
+
+    # check username
+    if not (5 <= len(username) <= 32):
+        message.append('Длина имени пользователя должна быть от 5 до 32 символов')
+    if not re.findall(BotUser.REGEX_TELEGRAM_NICKNAME, username):
+        message.append('Username должен состоять из английских букв любого регистра, цифр и подчеркивания')
+
+    if not message:
+        # create user
+        params = {
+            'tg_nick': username,
+            'role': role,
+            'status': BotUser.Status.active,
+        }
+        message = ['Пользователь успешно создан']
+        if role == BotUser.Role.client:
+            # client should have tariff
+
+            # looking for easy tariff
+            tariffs = Tariff.objects.exclude(name__startswith='test')
+            params['tariff'] = tariffs.filter(
+                can_reserve_contractor=False,
+                can_see_contractor_contacts=False,
+            ).first()
+            if params['tariff'] is None:
+                # looking for medium tariff
+                params['tariff'] = tariffs.filter(can_reserve_contractor=False).first()
+            if params['tariff'] is None:
+                # looking for any tariff
+                params['tariff'] = tariffs.first()
+            params['paid'] = True
+            message = ['Пользователь успешно создан с тарифом эконом по умолчанию']
+        role_to_model[role]['model'].objects.create(**params)
+    message = '\n'.join(message)
+    return message
+
+
 def process_bot_user(update: Update, context: CallbackContext, username: str, role: Client.Role, is_add: bool):
     """Process adding or create user with some role."""
     chat_id = update.effective_chat.id
@@ -61,51 +111,7 @@ def process_bot_user(update: Update, context: CallbackContext, username: str, ro
         username = username[1:]
 
     if is_add:
-        message = []
-        # check if this user not exists as active in all roles
-        for model_role in role_to_model.keys():
-            has_user_with_this_name = role_to_model[model_role]['model'].objects.active().filter(
-                role__in=list(role_to_model.keys()),
-                tg_nick=username,
-            ).exists()
-            if has_user_with_this_name:
-                message.append(
-                    f'Уже есть активный пользователь с ролью "{role_to_model[role]["name"]}" с таким username'
-                )
-
-        # check username
-        if not (5 <= len(username) <= 32):
-            message.append('Длина имени пользователя должна быть от 5 до 32 символов')
-        if not re.findall(BotUser.REGEX_TELEGRAM_NICKNAME, username):
-            message.append('Username должен состоять из английских букв любого регистра, цифр и подчеркивания')
-
-        if not message:
-            # create user
-            params = {
-                'tg_nick': username,
-                'role': role,
-                'status': BotUser.Status.active,
-            }
-            message = ['Пользователь успешно создан']
-            if role == BotUser.Role.client:
-                # client should have tariff
-
-                # looking for easy tariff
-                tariffs = Tariff.objects.exclude(name__startswith='test')
-                params['tariff'] = tariffs.filter(
-                    can_reserve_contractor=False,
-                    can_see_contractor_contacts=False,
-                ).first()
-                if params['tariff'] is None:
-                    # looking for medium tariff
-                    params['tariff'] = tariffs.filter(can_reserve_contractor=False).first()
-                if params['tariff'] is None:
-                    # looking for any tariff
-                    params['tariff'] = tariffs.first()
-                params['paid'] = True
-                message = ['Пользователь успешно создан с тарифом эконом по умолчанию']
-            role_to_model[role]['model'].objects.create(**params)
-        message = '\n'.join(message)
+        message = process_bot_user_add(role_to_model, username, role)
     else:
         try:
             user = role_to_model[role]['model'].objects.get(tg_nick=username)
@@ -167,7 +173,7 @@ def handle_menu_owner(update: Update, context: CallbackContext) -> str:
             in Order.objects.calculate_billing()
         ]
         data_for_writing = [header] + billing
-        filename = f'billing.csv'
+        filename = 'billing.csv'
         send_data_in_csv_file(update, context, filename, data_for_writing)
     elif query and query.data == 'orders_stats':  # owner request a stats of clients
         header = ['Начало биллинга', 'Клиент', 'Число заказов']
@@ -184,7 +190,7 @@ def handle_menu_owner(update: Update, context: CallbackContext) -> str:
             in Order.objects.calculate_average_orders_in_month()
         ]
         data_for_writing = [header] + clients_months_stats
-        filename = f'stats.csv'
+        filename = 'stats.csv'
         send_data_in_csv_file(update, context, filename, data_for_writing)
     elif query:
         for role in ['client', 'contractor', 'manager', 'owner']:

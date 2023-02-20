@@ -6,6 +6,7 @@ from telegram.ext.callbackcontext import CallbackContext
 from telegram.update import Update
 
 from support_app.models import Order
+from support_app.models import Client
 
 
 def start_client(update: Update, context: CallbackContext) -> str:
@@ -44,45 +45,20 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
     chat_id = update.effective_chat.id
     query = update.callback_query
     client = context.user_data['user'].client
-    client_state_buttons = ['create_order', 'get_back', 'get_back_to_order_creation', 'bind_contractors']
+    client_create_callbacks = ['create_order', 'get_back', 'get_back_to_order_creation']
     keyboard = [
         [InlineKeyboardButton('Вернуться назад', callback_data='get_back')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = 'Я вас не понял, нажмите одну из предложенных кнопок'  # answer when no one of if is True
-    if query and query.data in client_state_buttons:  # client request order creation
-        if not client.has_limit_of_orders():
-            message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
-        elif query and query.data == 'bind_contractors':
-            if not client.has_closed_orders():
-                message = 'У вас ещё не было завершенных заказов'
-                context.bot.send_message(text=message, chat_id=chat_id)
-                return start_client(update, context)
-            last_contractor = client.get_last_contractor_of_closed_order()
-            if client.is_assigned_contractor(last_contractor):
-                message = f'Этот подрядчик уже был закреплен за вами'
-            else:
-                client.assign_contractor(last_contractor)
-                message = f'Подрядчик был закреплен за вами'
-            context.bot.send_message(text=message, chat_id=chat_id)
-            return start_client(update, context)
-        elif client.has_active_order():
-            message = 'Ваша заявка ещё в обработке, пожалуйста ожидайте'
-        else:
-            with open('order_examples.txt', 'r', encoding='UTF8') as file:  # TODO: сохранить при старте бота
-                message = dedent('''
-                Вы можете оставить заявку в чате в формате:
-                - Сроки исполнения
-                - Суть заказа
-                - Что-нибудь еще
-
-                Примеры заявок:
-                ''')
-                order_examples = file.readlines()
-                for order_example in order_examples:
-                    message += order_example
-                context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
-            return 'WAITING_ORDER_TASK'
+    if query and query.data in client_create_callbacks:  # client request order creation
+        is_return, what_return, message = handle_client_creation_callbacks(context, client, chat_id, reply_markup)
+        if is_return:
+            return what_return
+    elif query and query.data == 'bind_contractors':
+        is_return, what_return, message = handle_bind_contractor_callback(update, context, client, chat_id)
+        if is_return:
+            return what_return
     elif query and query.data == 'send_message_to_contractor':  # client request send message to contractor
         message = 'У вас нет заказа взятого в работу'
         if client.has_in_work_order():
@@ -100,6 +76,65 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
 
     context.bot.send_message(chat_id=chat_id, text=message)
     return start_client(update, context)
+
+
+def handle_client_creation_callbacks(
+        context: CallbackContext,
+        client: Client,
+        chat_id: str,
+        reply_markup: InlineKeyboardMarkup,
+) -> tuple[bool, str, str]:
+    """
+    Handling client creation callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    if not client.has_limit_of_orders():
+        message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
+        return False, '', message
+    elif client.has_active_order():
+        message = 'Ваша заявка ещё в обработке, пожалуйста ожидайте'
+        return False, '', message
+    else:
+        with open('order_examples.txt', 'r', encoding='UTF8') as file:  # TODO: сохранить при старте бота
+            message = dedent('''
+            Вы можете оставить заявку в чате в формате:
+            - Сроки исполнения
+            - Суть заказа
+            - Что-нибудь еще
+
+            Примеры заявок:
+            ''')
+            order_examples = file.readlines()
+            for order_example in order_examples:
+                message += order_example
+            context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+        return True, 'WAITING_ORDER_TASK', ''
+
+
+def handle_bind_contractor_callback(
+        update: Update,
+        context: CallbackContext,
+        client: Client,
+        chat_id: str,
+) -> tuple[bool, str, str]:
+    """
+    Handling contractor bındıng callbacks.
+
+    Return bool means return or not and what return and also message if not return
+    """
+    if not client.has_closed_orders():
+        message = 'У вас ещё не было завершенных заказов'
+        context.bot.send_message(text=message, chat_id=chat_id)
+        return True, start_client(update, context), ''
+    last_contractor = client.get_last_contractor_of_closed_order()
+    if client.is_assigned_contractor(last_contractor):
+        message = 'Этот подрядчик уже был закреплен за вами'
+    else:
+        client.assign_contractor(last_contractor)
+        message = 'Подрядчик был закреплен за вами'
+    context.bot.send_message(text=message, chat_id=chat_id)
+    return True, start_client(update, context), ''
 
 
 def wait_message_to_contractor_client(update: Update, context: CallbackContext) -> str:
