@@ -62,9 +62,6 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             message = dedent(f'''
             Задание:
             {order.task}
-            
-            Доступы к сайту:
-            {order.creds}
             ''')
             keyboard = [
                 [InlineKeyboardButton('Взять в работу', callback_data=f'take_order|{order.pk}')],
@@ -195,7 +192,12 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
                 context.user_data['order_in_process'] = None
                 message_to_client = 'Ваш заказ взят работу! При выполнении пришлем уведомление.'
                 context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
-                message = 'Заказ успешно взят в работу, приятной работы'
+                message = dedent(f'''
+                Заказ успешно взят в работу, приятной работы
+                
+                Доступы к сайту:
+                {order_in_process.creds}
+                ''')
             else:
                 message = 'Оценка должна быть от 1 до 24 часов, попробуйте снова или обратитесь к менеджеру'
                 keyboard = [
