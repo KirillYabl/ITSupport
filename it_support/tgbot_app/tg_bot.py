@@ -187,11 +187,13 @@ class TgBot(object):
         for new_order in new_orders:
             # only send message without button
             # because contractor can do anything and button can broke his process
-            message = dedent(f'''Появился новый заказ, для взятие в работу нажмите "Посмотреть заказы"\
-                                 и выберите данный заказ:
+            message = dedent(f'''
+            Появился новый заказ, для взятие в работу нажмите "Посмотреть заказы"
+            и выберите данный заказ:
 
-                                 Задание:
-                                 {new_order.task}''')
+            Задание:
+            {new_order.task}
+            ''')
             client = new_order.client
             if not client.contractors.all():
                 # if no assigned contractors then send all available and mark then
@@ -229,8 +231,8 @@ class TgBot(object):
 
         # check that assigned contractors weren't informed too
         if is_inform_only_assigned_contractors and not new_order.assigned_contractors_informed:
-            for contractor in client.contractors.all():
-                contractor_chat_id = contractor.telegram_id
+            for assigned_contractor in client.contractors.all():
+                contractor_chat_id = assigned_contractor.contractor.telegram_id
                 context.bot.send_message(text=message, chat_id=contractor_chat_id)
                 new_order.assigned_contractors_informed = True
                 new_order.save()

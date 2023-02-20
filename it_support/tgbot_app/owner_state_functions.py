@@ -59,7 +59,6 @@ def process_bot_user_add(role_to_model: dict[BotUser.Role, dict[str, Any]], user
     if not message:
         # create user
         params = {
-            'tg_nick': username,
             'role': role,
             'status': BotUser.Status.active,
         }
@@ -81,7 +80,8 @@ def process_bot_user_add(role_to_model: dict[BotUser.Role, dict[str, Any]], user
                 params['tariff'] = tariffs.first()
             params['paid'] = True
             message = ['Пользователь успешно создан с тарифом эконом по умолчанию']
-        role_to_model[role]['model'].objects.create(**params)
+
+        role_to_model[role]['model'].objects.get_or_create(tg_nick=username, defaults=params)
     message = '\n'.join(message)
     return message
 

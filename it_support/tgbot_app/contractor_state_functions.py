@@ -89,7 +89,7 @@ def handle_take_order_callback(
 
     Return bool means return or not and what return and also message if not return
     """
-    order_pk = update.query.data.split('|')[-1]
+    order_pk = update.callback_query.data.split('|')[-1]
     bad_scenario = False
 
     if contractor.has_order_in_work():
@@ -154,7 +154,7 @@ def handle_close_order_callback(
     return False, '', message
 
 
-def handle_my_salary_callback(contractor: Contractor, ) -> tuple[bool, str, str]:
+def handle_my_salary_callback(contractor: Contractor) -> tuple[bool, str, str]:
     """
     Handling my salary callbacks.
 
@@ -210,7 +210,7 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         is_return, what_return, message = handle_close_order_callback(context, contractor)
         is_call_handlers = True
     elif query and query.data == 'my_salary':  # contractor request to get his salary in this month
-        is_return, what_return, message = handle_my_salary_callback(context, contractor)
+        is_return, what_return, message = handle_my_salary_callback(contractor)
         is_call_handlers = True
     elif query and query.data.startswith('take_order'):  # contractor request to take order
         is_return, what_return, message = handle_take_order_callback(update, context, contractor, chat_id)
