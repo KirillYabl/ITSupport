@@ -55,21 +55,16 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
         if not client.has_limit_of_orders():
             message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
         elif query and query.data == 'bind_contractors':
-            if not client.get_contractors():
+            if not client.has_closed_orders():
                 message = 'У вас ещё не было завершенных заказов'
                 context.bot.send_message(text=message, chat_id=chat_id)
                 return start_client(update, context)
-            last_contractor = Contractor.objects.get(
-                tg_nick=client.get_contractors().first()['contractor__tg_nick']
-            )
+            last_contractor = client.get_last_contractor_of_closed_order()
             if client.is_assigned_contractor(last_contractor):
-                message = f'За вами уже закреплен подрядчик @{last_contractor.tg_nick}'
+                message = f'Этот подрядчик уже был закреплен за вами'
             else:
-                last_contractor = Contractor.objects.get(
-                    tg_nick=client.get_contractors().first()['contractor__tg_nick']
-                )
                 client.assign_contractor(last_contractor)
-                message = f'Вы закрепили за собой подрядчика @{last_contractor.tg_nick}'
+                message = f'Подрядчик был закреплен за вами'
             context.bot.send_message(text=message, chat_id=chat_id)
             return start_client(update, context)
         elif client.has_active_order():

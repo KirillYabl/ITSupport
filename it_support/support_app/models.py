@@ -151,6 +151,18 @@ class Client(BotUser):
         assigned_contractors_ids = [contractor.pk for contractor in self.contractors.all()]
         return Contractor.objects.active().get_available().exclude(pk__in=assigned_contractors_ids)
 
+    def has_closed_orders(self):
+        """Есть ли закрытые контракты"""
+        return self.orders.filter(status=Order.Status.closed).exists()
+
+    def get_last_closed_order(self):
+        """Получить последний закрытый контракт"""
+        return self.orders.select_related('client').filter(status=Order.Status.closed).latest('closed_at')
+
+    def get_last_contractor_of_closed_order(self):
+        """Получить подрядчика последнего закрытого контракта"""
+        return self.get_last_closed_order().contractor
+
     objects = ClientQuerySet.as_manager()
 
     class Meta:
