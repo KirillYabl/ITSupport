@@ -59,7 +59,8 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             return start_contractor(update, context)
         for order in available_orders:
             # send every order in different message because it contains button to take order
-            message = dedent(f'''Задание:
+            message = dedent(f'''
+            Задание:
             {order.task}
             
             Доступы к сайту:
@@ -121,9 +122,11 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
             bad_scenario = True
 
         if not bad_scenario:
-            message = dedent('''Пришлите приблизительную оценку требуемого на выполнения времени в часах \
-                                Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени \
-                                обратитесь к менеджерам, мы не оказываем проектную поддержку''')
+            message = dedent('''
+            Пришлите приблизительную оценку требуемого на выполнения времени в часах
+            Оценка от 1 до 24 часов, если вы считаете, что заказ потребует больше времени
+            обратитесь к менеджерам, мы не оказываем проектную поддержку
+            ''')
             context.user_data['order_in_process'] = order
             keyboard = [
                 [InlineKeyboardButton('Вернуться в начало', callback_data='return_to_start')],
@@ -190,7 +193,7 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
                 client_chat_id = order_in_process.client.telegram_id
                 order_in_process.take_in_work(contractor, estimated_time_hours)
                 context.user_data['order_in_process'] = None
-                message_to_client = dedent('Ваш заказ взят работу! При выполнении пришлем уведомление.')
+                message_to_client = 'Ваш заказ взят работу! При выполнении пришлем уведомление.'
                 context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
                 message = 'Заказ успешно взят в работу, приятной работы'
             else:
