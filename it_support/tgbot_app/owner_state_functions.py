@@ -20,8 +20,14 @@ from support_app.models import Owner
 from support_app.models import Tariff
 
 
+import logging
+
+logger = logging.getLogger('tgbot_app_info')
+
+
 def send_data_in_csv_file(update: Update, context: CallbackContext, filename: str, data_for_writing: list[list[str]]):
     """Save data in csv and send it."""
+    logger.info('function "send_data_in_csv_file" was run')
     os_filename = f'{time.time()}_{random.randint(1, 2 ** 20)}_{filename}'
     chat_id = update.effective_chat.id
     try:
@@ -33,11 +39,13 @@ def send_data_in_csv_file(update: Update, context: CallbackContext, filename: st
     finally:
         try:
             os.remove(os_filename)
+            logger.info('function "send_data_in_csv_file" ended\n')
         except FileNotFoundError:
             pass
 
 
 def process_bot_user_add(role_to_model: dict[BotUser.Role, dict[str, Any]], username: str, role: Client.Role) -> str:
+    logger.info('function "process_bot_user_add" was run')
     message = []
     # check if this user not exists as active in all roles
     for model_role in role_to_model.keys():
@@ -83,11 +91,13 @@ def process_bot_user_add(role_to_model: dict[BotUser.Role, dict[str, Any]], user
 
         role_to_model[role]['model'].objects.get_or_create(tg_nick=username, defaults=params)
     message = '\n'.join(message)
+    logger.info('function "process_bot_user_add" ended\n')
     return message
 
 
 def process_bot_user(update: Update, context: CallbackContext, username: str, role: Client.Role, is_add: bool):
     """Process adding or create user with some role."""
+    logger.info('function "process_bot_user" was run')
     chat_id = update.effective_chat.id
     role_to_model = {
         BotUser.Role.client: {
@@ -122,10 +132,12 @@ def process_bot_user(update: Update, context: CallbackContext, username: str, ro
             message = 'Пользователь с таким именем не найден'
 
     context.bot.send_message(text=message, chat_id=chat_id)
+    logger.info('function "process_bot_user" ended\n')
 
 
 def start_owner(update: Update, context: CallbackContext) -> str:
     """Owner start function which send a menu"""
+    logger.info('function "start_owner" was run with the /start command')
     chat_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton('Биллинг подрядчиков за прошлый месяц', callback_data='contractor_billing_prev_month')],
@@ -149,11 +161,13 @@ def start_owner(update: Update, context: CallbackContext) -> str:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(text='Что вас интересует', reply_markup=reply_markup, chat_id=chat_id)
+    logger.info('function "start_owner" ended\n')
     return 'HANDLE_MENU_OWNER'
 
 
 def handle_menu_owner(update: Update, context: CallbackContext) -> str:
     """Owner menu handler"""
+    logger.info('function "handle_menu_owner" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
 
@@ -199,12 +213,13 @@ def handle_menu_owner(update: Update, context: CallbackContext) -> str:
                     message = f'Пришлите username. Пример: @{role}'
                     context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
                     return f'WAITING_USERNAME_{role.upper()}_{action.upper()}'
-
+    logger.info('function "handle_menu_owner" ended\n')
     return start_owner(update, context)
 
 
 def waiting_username(update: Update, context: CallbackContext, role: Client.Role, is_add: bool) -> str:
     """Waiting username and call user process"""
+    logger.info('function "waiting_username" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -218,10 +233,11 @@ def waiting_username(update: Update, context: CallbackContext, role: Client.Role
         context.bot.send_message(text=message, chat_id=chat_id)
     else:
         process_bot_user(update, context, username, role, is_add)
-
+    logger.info('function "waiting_username" ended\n')
     return start_owner(update, context)
 
 
+logger.info('"waiting_username" was run ')
 waiting_username_client_add = partial(waiting_username, role=BotUser.Role.client, is_add=True)
 waiting_username_contractor_add = partial(waiting_username, role=BotUser.Role.contractor, is_add=True)
 waiting_username_manager_add = partial(waiting_username, role=BotUser.Role.manager, is_add=True)
@@ -230,3 +246,4 @@ waiting_username_client_delete = partial(waiting_username, role=BotUser.Role.cli
 waiting_username_contractor_delete = partial(waiting_username, role=BotUser.Role.contractor, is_add=False)
 waiting_username_manager_delete = partial(waiting_username, role=BotUser.Role.manager, is_add=False)
 waiting_username_owner_delete = partial(waiting_username, role=BotUser.Role.owner, is_add=False)
+logger.info('"waiting_username" ended\n')

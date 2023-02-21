@@ -8,9 +8,13 @@ from telegram.update import Update
 from support_app.models import Order
 from support_app.models import Client
 
+import logging
+
+logger = logging.getLogger('tgbot_app_info')
 
 def start_client(update: Update, context: CallbackContext) -> str:
     """Client start function which send a menu"""
+    logger.info('function "start_client" was run with the /start command')
     chat_id = update.effective_chat.id
     text = 'Здравствуйте, что вы хотите?'
     client = context.user_data['user'].client
@@ -38,10 +42,12 @@ def start_client(update: Update, context: CallbackContext) -> str:
         )
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+    logger.info('function "start_client" ended\n')
     return 'HANDLE_MENU_CLIENT'
 
 
 def handle_menu_client(update: Update, context: CallbackContext) -> str:
+    logger.info('function "handle_menu_client" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     client = context.user_data['user'].client
@@ -75,6 +81,7 @@ def handle_menu_client(update: Update, context: CallbackContext) -> str:
             message = 'У вас ещё не было завершенных заказов'
 
     context.bot.send_message(chat_id=chat_id, text=message)
+    logger.info('function "handle_menu_client" ended\n')
     return start_client(update, context)
 
 
@@ -89,6 +96,7 @@ def handle_client_creation_callbacks(
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_client_creation_callbacks" was run')
     if not client.has_limit_of_orders():
         message = 'На вашем тарифе закончились заявки, вы можете купить повышенный тариф'
         return False, '', message
@@ -109,6 +117,7 @@ def handle_client_creation_callbacks(
             for order_example in order_examples:
                 message += order_example
             context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+            logger.info('function "handle_client_creation_callbacks" ended\n')
         return True, 'WAITING_ORDER_TASK', ''
 
 
@@ -123,6 +132,7 @@ def handle_bind_contractor_callback(
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_bind_contractor_callback" was run')
     if not client.has_closed_orders():
         message = 'У вас ещё не было завершенных заказов'
         context.bot.send_message(text=message, chat_id=chat_id)
@@ -134,11 +144,13 @@ def handle_bind_contractor_callback(
         client.assign_contractor(last_contractor)
         message = 'Подрядчик был закреплен за вами'
     context.bot.send_message(text=message, chat_id=chat_id)
+    logger.info('function "handle_bind_contractor_callback" ended\n')
     return True, start_client(update, context), ''
 
 
 def wait_message_to_contractor_client(update: Update, context: CallbackContext) -> str:
     """Handler of waiting client message to contractor"""
+    logger.info('function "wait_message_to_contractor_client" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -160,12 +172,13 @@ def wait_message_to_contractor_client(update: Update, context: CallbackContext) 
 
         message = 'Сообщение успешно отправлено, когда подрядчик ответит вам придет уведомление'
     context.bot.send_message(text=message, chat_id=chat_id)
-
+    logger.info('function "wait_message_to_contractor_client" ended\n')
     return start_client(update, context)
 
 
 def waiting_order_task(update: Update, context: CallbackContext) -> str:
     """Handler of waiting client task for order"""
+    logger.info('function "waiting_order_task" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -187,11 +200,13 @@ def waiting_order_task(update: Update, context: CallbackContext) -> str:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+        logger.info('function "waiting_order_task" ended\n')
         return 'WAITING_CREDENTIALS'
 
 
 def waiting_credentials(update: Update, context: CallbackContext) -> str:
     """Handler of waiting client credentials"""
+    logger.info('function "waiting_credentials" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -221,4 +236,5 @@ def waiting_credentials(update: Update, context: CallbackContext) -> str:
         context.user_data['creating_order_task'] = None
         message = f'Спасибо! Ваш заказ успешно создан.\nЗаказ будет взят в течении {hours} ч. {minutes} мин.'
         context.bot.send_message(chat_id=chat_id, text=message)
+        logger.info('function "waiting_credentials" ended\n')
         return start_client(update, context)

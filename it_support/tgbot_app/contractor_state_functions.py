@@ -9,9 +9,14 @@ from support_app.models import Order
 from support_app.models import SystemSettings
 from support_app.models import Contractor
 
+import logging
+
+logger = logging.getLogger('tgbot_app_info')
+
 
 def start_contractor(update: Update, context: CallbackContext) -> str:
     """Contractor start function which send a menu"""
+    logger.info('function "start_contractor" was run with the /start command')
     chat_id = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton('Как это работает?', callback_data='how_contractor_bot_work')],
@@ -22,6 +27,7 @@ def start_contractor(update: Update, context: CallbackContext) -> str:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(text='Выберите действие', reply_markup=reply_markup, chat_id=chat_id)
+    logger.info('function "start_contractor" ended\n')
     return 'HANDLE_MENU_CONTRACTOR'
 
 
@@ -35,6 +41,7 @@ def handle_watch_orders_callback(
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_watch_orders_callback" was run')
     available_orders = list(Order.objects.get_available())
     if not available_orders:
         message = 'Нет заказов, которые можно взять в работу'
@@ -53,6 +60,7 @@ def handle_watch_orders_callback(
             keyboard.append([InlineKeyboardButton('Вернуться назад', callback_data='get_back')])
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(text=message, reply_markup=reply_markup, chat_id=chat_id)
+        logger.info('function "handle_watch_orders_callback" ended\n')
     return True, 'HANDLE_MENU_CONTRACTOR', ''
 
 
@@ -66,6 +74,7 @@ def handle_send_message_to_client_callback(
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_send_message_to_client_callback" was run')
     message = 'У вас нет активного заказа'
     if contractor.has_order_in_work():
         message = 'Напишите сообщение клиенту'
@@ -75,6 +84,7 @@ def handle_send_message_to_client_callback(
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
         return True, 'WAIT_MESSAGE_TO_CLIENT_CONTRACTOR', ''
+    logger.info('function "handle_send_message_to_client_callback" ended\n')
     return False, '', message
 
 
@@ -89,6 +99,7 @@ def handle_take_order_callback(
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_take_order_callback" was run')
     order_pk = update.callback_query.data.split('|')[-1]
     bad_scenario = False
 
@@ -125,6 +136,7 @@ def handle_take_order_callback(
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(text=message, chat_id=chat_id, reply_markup=reply_markup)
         return True, 'WAIT_ESTIMATE_CONTRACTOR', ''
+        logger.info('function "handle_take_order_callback" ended\n')
     return False, '', message
 
 
@@ -137,6 +149,7 @@ def handle_close_order_callback(
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_close_order_callback" was run')
     message = 'У вас нет активного заказа'
     if contractor.has_order_in_work():
         order_in_work = contractor.get_order_in_work()
@@ -151,6 +164,7 @@ def handle_close_order_callback(
             message_to_client += 'Вы можете закрепить последнего подрядчика.'
         context.bot.send_message(text=message_to_client, chat_id=client_chat_id)
         message = 'Спасибо за вашу работу! Теперь вы можете брать новый заказ'
+        logger.info('function "handle_close_order_callback" ended\n')
     return False, '', message
 
 
@@ -160,6 +174,7 @@ def handle_my_salary_callback(contractor: Contractor) -> tuple[bool, str, str]:
 
     Return bool means return or not and what return and also message if not return
     """
+    logger.info('function "handle_my_salary_callback" was run')
     closed_orders_count = contractor.get_closed_in_actual_billing_orders().count()
     try:
         order_rate = int(SystemSettings.objects.get(
@@ -169,11 +184,13 @@ def handle_my_salary_callback(contractor: Contractor) -> tuple[bool, str, str]:
         order_rate = 500
     salary = closed_orders_count * order_rate
     message = f'Выполнено заказав в отчетном периоде: {closed_orders_count}. К выплате {salary} руб.'
+    logger.info('function "handle_my_salary_callback" ended\n')
     return False, '', message
 
 
 def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
     """Manager menu handler"""
+    logger.info('function "handle_menu_contractor" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     contractor = context.user_data['user'].contractor
@@ -220,12 +237,13 @@ def handle_menu_contractor(update: Update, context: CallbackContext) -> str:
         return what_return
 
     context.bot.send_message(text=message, chat_id=chat_id)
-
+    logger.info('function "handle_menu_contractor" ended\n')
     return start_contractor(update, context)
 
 
 def wait_message_to_client_contractor(update: Update, context: CallbackContext) -> str:
     """Handler of waiting contractor message to client"""
+    logger.info('function "wait_message_to_client_contractor" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -248,12 +266,13 @@ def wait_message_to_client_contractor(update: Update, context: CallbackContext) 
 
         message = 'Сообщение успешно отправлено, когда заказчик ответит вам придет уведомление'
     context.bot.send_message(text=message, chat_id=chat_id)
-
+    logger.info('function "wait_message_to_client_contractor" ended\n')
     return start_contractor(update, context)
 
 
 def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
     """Handler of waiting estimate from contractor while he is giving an order"""
+    logger.info('function "wait_estimate_contractor" was run')
     chat_id = update.effective_chat.id
     query = update.callback_query
     no_text_message = True
@@ -301,4 +320,5 @@ def wait_estimate_contractor(update: Update, context: CallbackContext) -> str:
             return 'WAIT_ESTIMATE_CONTRACTOR'
 
     context.bot.send_message(text=message, chat_id=chat_id)
+    logger.info('function "wait_estimate_contractor" ended\n')
     return start_contractor(update, context)
